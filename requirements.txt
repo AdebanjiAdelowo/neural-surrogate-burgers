@@ -1,0 +1,7 @@
+# Planned dependencies — not yet installed or version-pinned against a working environment.
+
+numpy
+scipy          # SVD for POD basis, sparse/dense linear algebra
+matplotlib
+torch          # neural surrogate
+pytest
