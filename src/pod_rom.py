@@ -51,8 +51,19 @@ def rom_predict(u0: np.ndarray, Phi: np.ndarray, k: np.ndarray, nu: float,
     """
     a = Phi.T @ u0  # project initial condition onto the POD basis
     if dt is None:
-        dt = 0.25 * (2 * np.pi / len(u0)) / (np.abs(u0).max() + 1e-8)
-    n_steps = max(1, int(np.ceil(T / dt)))
+        # Unlike src.solver (which handles diffusion exactly via an integrating factor), this
+        # explicit RK4 in reduced coordinates has no such treatment, so it is only conditionally
+        # stable in the diffusion term too. Bug found during Stage 5 evaluation: using only the
+        # advective bound (matching src.solver's dt) produced NaN via an unstable diffusion step.
+        # Fixed by also respecting the standard explicit-diffusion stability limit
+        # dt < dx^2 / (2*nu), using the full grid's dx even though the ROM never touches the full
+        # grid directly (the reconstructed field's derivatives are still evaluated on it).
+        Nx = len(u0)
+        dx = (2 * np.pi) / Nx
+        dt_advective = 0.25 * dx / (np.abs(u0).max() + 1e-8)
+        dt_diffusive = 0.4 * dx**2 / (2 * nu + 1e-12)
+        dt = min(dt_advective, dt_diffusive)
+    n_steps = max(4 * n_save, int(np.ceil(T / dt)))
     dt = T / n_steps
     save_steps = set(np.linspace(0, n_steps, n_save, dtype=int).tolist())
 

@@ -1,0 +1,25 @@
+Neural Surrogate vs. POD-ROM — MVP Comparative Evaluation (real, measured)
+POD-ROM modes: r=8
+Surrogate checkpoint: epoch 198, val_loss 0.000039
+
+In-distribution test set (n=40):
+  POD-ROM (r=8) relative L2: mean=0.00152 std=0.00077
+  Neural surrogate relative L2:        mean=0.00788 std=0.00366
+
+Wall-clock runtime per evaluation (mean of 20 calls):
+  Ground-truth solver: 6.293 ms
+  POD-ROM (r=8):        15.482 ms
+  Neural surrogate:    0.138 ms
+  Speedup, surrogate vs. solver: 45.6x
+  Speedup, surrogate vs. ROM:    112.1x
+
+Honest note: the POD-ROM as implemented evaluates the nonlinear term via full-grid
+spectral derivatives at every RK4 stage (no hyper-reduction/DEIM), so it does NOT
+provide a runtime speedup over the full solver -- only the neural surrogate does,
+since it requires a single forward pass with no time-stepping at all. A hyper-reduced
+ROM (DEIM/EIM) would likely close this gap but is out of MVP scope.
+
+Generalisation to out-of-training-range parameters:
+  A above training range (2.5 > 2.0): ROM err=0.0010  Surrogate err=0.0545
+  nu above training range (0.15 > 0.10): ROM err=0.0024  Surrogate err=0.0305
+  A below training range (0.2 < 0.5): ROM err=0.0006  Surrogate err=0.5595

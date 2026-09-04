@@ -44,6 +44,29 @@ def test_rom_prediction_shape_and_finiteness():
     assert np.isfinite(u_pred).all()
 
 
+def test_rom_stable_at_higher_viscosity_extrapolation():
+    # Regression test for a real bug found during Stage 5 evaluation: rom_predict's default dt
+    # only respected an advective stability bound, not the diffusion stability bound needed by
+    # explicit RK4 in reduced coordinates (src.solver avoids this via an integrating factor,
+    # rom_predict does not). This produced NaN at nu=0.15 (outside the [0.01,0.1] training range).
+    # Fixed by also bounding dt by the standard explicit-diffusion limit dx^2/(2*nu).
+    Nx = 128
+    L = 2 * np.pi
+    k = 2 * np.pi * np.fft.fftfreq(Nx, d=L / Nx)
+    dealias = np.abs(k) < (2.0 / 3.0) * np.max(np.abs(k))
+    rng = np.random.default_rng(0)
+    ensemble = []
+    for _ in range(10):
+        A, nu = rng.uniform(0.5, 2.0), rng.uniform(0.01, 0.1)
+        _, _, u = solve_burgers(A=A, nu=nu, Nx=Nx, T=1.0, n_save=10)
+        ensemble.append(u)
+    Phi, _ = build_pod_basis(np.concatenate(ensemble, axis=0), r=8)
+
+    _, _, gt = solve_burgers(A=1.0, nu=0.15, Nx=Nx, T=1.0, n_save=10)  # nu above training range
+    _, u_pred = rom_predict(gt[0], Phi, k, 0.15, dealias, T=1.0, n_save=10)
+    assert np.isfinite(u_pred).all()
+
+
 def test_more_modes_reduces_prediction_error():
     # The central real behaviour this baseline exists to demonstrate: accuracy improves as
     # retained modes increase.

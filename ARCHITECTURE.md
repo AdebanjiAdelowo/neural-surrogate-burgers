@@ -1,6 +1,9 @@
 # Architecture — Neural Surrogate vs. POD-Galerkin ROM for Burgers' Equation
 
-Status: planning document. Every section is a plan, not a report of completed work.
+**Status: MVP implemented and verified** — see `IMPLEMENTATION_LOG.md` for the stage-by-stage
+record and `report/mvp_results.txt` for real results. Not implemented (explicit MVP stop
+condition): FNO/DeepONet comparison (§9 extension point), multi-dimensional PDEs, uncertainty
+quantification, hyper-reduction of the ROM's nonlinear term.
 
 ## 1. Research problem
 

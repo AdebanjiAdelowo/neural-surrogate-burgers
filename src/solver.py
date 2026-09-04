@@ -42,6 +42,11 @@ def solve_burgers(A: float, nu: float, Nx: int = 128, L: float = 2 * np.pi,
         # integrating factor, so only the nonlinear term constrains dt).
         dt = 0.25 * (L / Nx) / (abs(A) + 1e-8)
     n_steps = max(1, int(np.ceil(T / dt)))
+    # Ensure comfortably more steps than requested snapshots: found during Stage 5 evaluation
+    # (neural-surrogate-burgers) that when n_steps was not >> n_save, the integer-rounded
+    # np.linspace(0, n_steps, n_save) snapshot-selection could collide onto fewer than n_save
+    # distinct step indices for some (A, nu) combinations, silently under-producing snapshots.
+    n_steps = max(n_steps, 4 * n_save)
     dt = T / n_steps  # adjust so n_steps evenly divides [0, T]
 
     Lop = -nu * k**2  # linear operator eigenvalues (diffusion)
