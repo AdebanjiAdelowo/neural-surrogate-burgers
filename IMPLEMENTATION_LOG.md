@@ -107,3 +107,32 @@ evidence rather than assumed in the original architecture.
 **Decision:** proceed to Stage 4 (neural surrogate) using $r$=8 as the POD-ROM comparison point.
 
 ---
+
+## Stage 4 — Neural surrogate — **VERIFIED**
+
+**Architecture decision (documented, not silent):** `ARCHITECTURE.md` specified "CNN or MLP." A
+CNN is architecturally inappropriate here — the input is two scalars $(A, \nu)$, not spatial data
+with local structure. Implemented `src/surrogate_net.py::BurgersSurrogateMLP`, a small MLP mapping
+normalised $(A, \nu) \in [0,1]^2$ directly to the flattened $(n_{\text{save}}, N_x)$ solution
+field — a direct amortised regression requiring no time-stepping at inference, which is the
+surrogate's structural speed advantage over both the ground-truth solver and the POD-ROM (both of
+which integrate an ODE/PDE forward in time).
+
+**Verification performed, in order:**
+1. Forward-pass shape/finiteness tests — **PASS**.
+2. **Overfit sanity check** (required before full training): loss dropped from 0.422 to 0.000018
+   (ratio 0.00004) on a fixed 4-example batch — **PASSED**, confirms the training pipeline can
+   actually learn.
+3. **Full training run**: 200 epochs, batch size 16, on the real 200-example train / 40-example
+   val split. **8.4 seconds wall-clock** (MPS). Train loss 0.724 → 0.00004, val loss 0.296 →
+   0.00004, monotonically decreasing, train/val tracking closely (no sign of severe overfitting).
+
+**Result:** the surrogate trains stably and fits the training distribution very well — expected,
+given Stage 3 already established that this problem family is highly compressible/low-dimensional;
+the interesting comparison is not "can it fit" but "how does it compare to POD-ROM on held-out
+parameters, and on speed" — Stage 5.
+
+**Decision:** proceed to Stage 5 (comparative evaluation): ground-truth solver vs. POD-ROM ($r$=8)
+vs. neural surrogate, on the held-out test split.
+
+---
