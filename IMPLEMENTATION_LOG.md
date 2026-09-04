@@ -49,3 +49,27 @@ not merely "it produces finite output." All 7 tests **PASS**.
 **Decision:** proceed to dataset generation using this solver.
 
 ---
+
+## Stage 2 — Dataset generation — **VERIFIED**
+
+**Implementation:** `scripts/generate_dataset.py`. Parameters $(A, \nu)$ sampled uniformly at
+random from documented ranges ($A \in [0.5, 2.0]$, $\nu \in [0.01, 0.1]$), fixed non-overlapping
+seed ranges per split (train: seeds 0–199, val: 100000–100039, test: 200000–200039). Grid
+$N_x$=128, $T$=1.0, 20 saved snapshots per example — same defaults verified in Stage 1.
+
+**Verification performed:**
+- Ran for real: 200 train + 40 val + 40 test = 280 examples generated in **1.4 seconds**.
+- Confirmed parameter ranges actually sampled span close to the full documented range in each
+  split (e.g. train $A \in [0.504, 1.996]$, $\nu \in [0.0100, 0.0997]$).
+- **Programmatic leakage check passed**: no $(A,\nu)$ pair shared across splits.
+- Visually inspected spacetime fields for 4 train examples (`report/dev_dataset_samples.png`):
+  clear, sensible parameter dependence — higher $A$ / lower $\nu$ produces a visibly sharper
+  transition front, exactly the physical trend Stage 1 already confirmed for individual solves.
+
+**Result:** `data/{train,val,test}.npz` created (not committed — gitignored; fixed proactively
+this time, before any data was generated, learning from the `photoacoustic-reconstruction`
+project's earlier `.gitignore` gap).
+
+**Decision:** proceed to Stage 3 (POD-Galerkin ROM baseline).
+
+---
