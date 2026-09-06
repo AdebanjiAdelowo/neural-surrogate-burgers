@@ -19,12 +19,11 @@ methods (for example, the Fourier Neural Operator and DeepONet).
 
 Governing equation:
 
-```
-u_t + u u_x = nu * u_xx,   x in [0, L) periodic,   t in [0, T]
-u(x, 0) = A * sin(2*pi*x/L)
-```
+$$\frac{\partial u}{\partial t} + u \frac{\partial u}{\partial x} = \nu \frac{\partial^2 u}{\partial x^2}, \qquad x \in [0, L) \text{ periodic}, \quad t \in [0, T]$$
 
-The initial condition is parameterised by amplitude `A` and viscosity `nu`. Smaller `nu` produces
+$$u(x, 0) = A \sin\!\left(\frac{2\pi x}{L}\right)$$
+
+The initial condition is parameterised by amplitude $A$ and viscosity $\nu$. Smaller $\nu$ produces
 steeper gradients and is the more challenging regime for both reduced-order and learned models.
 
 **Research question:** for held-out parameters, how do a POD-Galerkin ROM and a neural surrogate
@@ -49,10 +48,10 @@ distribution and outside it (extrapolation)?
 
 ## Experimental Setup
 
-**Dataset** (`scripts/generate_dataset.py`): parameters `(A, nu)` sampled uniformly at random from
-`A in [0.5, 2.0]`, `nu in [0.01, 0.1]`, with fixed non-overlapping RNG seed ranges per split (train:
+**Dataset** (`scripts/generate_dataset.py`): parameters $(A, \nu)$ sampled uniformly at random from
+$A \in [0.5, 2.0]$, $\nu \in [0.01, 0.1]$, with fixed non-overlapping RNG seed ranges per split (train:
 0-199, val: 100000-100039, test: 200000-200039). Grid `Nx = 128`, `T = 1.0`, 20 saved snapshots per
-example. Splits: 200 train, 40 validation, 40 test examples. No `(A, nu)` pair is shared across
+example. Splits: 200 train, 40 validation, 40 test examples. No $(A, \nu)$ pair is shared across
 splits (checked programmatically at generation time). Data files are generated locally and are not
 committed to the repository.
 
@@ -64,19 +63,23 @@ non-trivial accuracy baseline rather than the easiest possible case for the ROM.
 **Neural surrogate training** (`scripts/train_surrogate.py`): a 3-hidden-layer MLP (width 128)
 trained for 200 epochs with batch size 16 and the Adam optimiser (`lr = 1e-3`).
 
-**Evaluation** (`scripts/evaluate_comparison.py`): relative L2 error against the ground-truth
+**Evaluation** (`scripts/evaluate_comparison.py`): relative $L^2$ error against the ground-truth
 solver and wall-clock runtime per evaluation, on the held-out test split and on three parameter
-settings deliberately chosen outside the training range.
+settings deliberately chosen outside the training range. The relative $L^2$ error for a predicted
+space-time field $\hat u$ against the solver-generated reference $u$ (both flattened over the saved
+snapshots and grid points) is
+
+$$\varepsilon = \frac{\lVert \hat u - u \rVert_2}{\lVert u \rVert_2}$$
 
 ## Results
 
-**In-distribution accuracy and runtime** (test set, n = 40, POD-ROM r = 8):
+**In-distribution accuracy and runtime** (test set, $n = 40$, POD-ROM $r = 8$):
 
-| Method | Relative L2 error (mean +/- std) | Runtime per evaluation |
+| Method | Relative $L^2$ error (mean ± std) | Runtime per evaluation |
 |---|---|---|
 | Ground-truth solver | (reference) | 6.29 ms |
-| POD-ROM (r = 8) | 0.152% +/- 0.077% | 15.48 ms |
-| Neural surrogate | 0.788% +/- 0.366% | 0.138 ms |
+| POD-ROM ($r = 8$) | 0.152% ± 0.077% | 15.48 ms |
+| Neural surrogate | 0.788% ± 0.366% | 0.138 ms |
 
 The POD-ROM is more accurate in-distribution, consistent with this problem family being highly
 linearly compressible. The neural surrogate is 45.6x faster than the full solver and 112x faster
@@ -92,15 +95,15 @@ cases; see `report/mvp_extrapolation.png`):
 
 | Case | POD-ROM error | Neural surrogate error |
 |---|---|---|
-| `A = 2.5` (training max 2.0) | 0.10% | 5.45% |
-| `nu = 0.15` (training max 0.10) | 0.24% | 3.05% |
-| `A = 0.2` (training min 0.5) | 0.06% | 55.95% |
+| $A = 2.5$ (training max 2.0) | 0.10% | 5.45% |
+| $\nu = 0.15$ (training max 0.10) | 0.24% | 3.05% |
+| $A = 0.2$ (training min 0.5) | 0.06% | 55.95% |
 
 Across these three cases the POD-ROM's error stays below 0.24%, while the neural surrogate's error
 ranges from 3.05% to 55.95%. The ROM generalises far better outside the training distribution
 because it is built directly on the governing equations (Galerkin projection remains valid physics
 wherever it is evaluated), while the neural surrogate is a black-box interpolator that degrades,
-and at `A = 0.2` degrades severely, once evaluated outside the parameter range it was trained on
+and at $A = 0.2$ degrades severely, once evaluated outside the parameter range it was trained on
 (visible as high-frequency noise in `report/mvp_extrapolation.png`).
 
 **Summary:** for this problem, the classical POD-Galerkin ROM is both more accurate and
@@ -172,8 +175,8 @@ shape and finiteness).
   full grid at every RK4 stage, so it does not provide a runtime speedup over the full solver despite
   reducing the state dimension.
 - The neural surrogate is trained only on the sinusoidal single-mode initial condition family
-  described above; its extrapolation behaviour outside `A in [0.5, 2.0]`, `nu in [0.01, 0.1]` is not
-  representative of other initial-condition families.
+  described above; its extrapolation behaviour outside $A \in [0.5, 2.0]$, $\nu \in [0.01, 0.1]$ is
+  not representative of other initial-condition families.
 - The ground-truth solver is verified via physical invariants (mass conservation, monotonic energy
   dissipation), a known shock-formation location, and grid-refinement consistency, rather than
   against an exact Cole-Hopf analytical solution.

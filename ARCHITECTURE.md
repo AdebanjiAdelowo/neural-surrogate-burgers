@@ -14,12 +14,10 @@ classical linear POD-Galerkin reduced-order model — and how does each method's
 when evaluated on parameters outside the training range (extrapolation) versus within it
 (interpolation)?
 
-**Motivation:** surrogate/reduced-order modelling is the named "reduced-order models, ML-enhanced
-simulation" requirement in the Quaini (TUM) posting, and more broadly one of the most reused
-capabilities across scientific-ML, computational-engineering, and digital-twin applications.
-Burgers' equation is the standard nonlinear benchmark in this literature (used by, e.g., the
-Fourier Neural Operator and DeepONet papers), giving established baselines and known failure modes
-to validate against.
+**Motivation:** surrogate/reduced-order modelling is one of the most reused capabilities across
+scientific-ML, computational-engineering, and digital-twin applications. Burgers' equation is the
+standard nonlinear benchmark in this literature (used by, e.g., the Fourier Neural Operator and
+DeepONet papers), giving established baselines and known failure modes to validate against.
 
 **Novelty classification:** comparative study / new application of established methods — not a
 methodological contribution. Do not describe this as novel without new evidence to support that.
