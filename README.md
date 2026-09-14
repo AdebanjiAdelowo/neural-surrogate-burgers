@@ -82,8 +82,10 @@ $$\varepsilon = \frac{\lVert \hat u - u \rVert_2}{\lVert u \rVert_2}$$
 | Neural surrogate | 0.788% ± 0.366% | 0.138 ms |
 
 The POD-ROM is more accurate in-distribution, consistent with this problem family being highly
-linearly compressible. The neural surrogate is 45.6x faster than the full solver and 112x faster
-than the ROM, since it requires a single forward pass with no time-stepping.
+linearly compressible. The neural surrogate is roughly 40-45x faster than the full solver on
+laptop-scale hardware (measured wall-clock; the exact multiplier varies run to run, e.g. 45.6x and
+~42x on two independent runs) and on the same order faster than the ROM, since it requires a single
+forward pass with no time-stepping.
 
 The POD-ROM as implemented is slower than the full solver, because it evaluates the nonlinear term
 via full-grid spectral derivatives at every RK4 stage (no hyper-reduction or DEIM): it reduces the
