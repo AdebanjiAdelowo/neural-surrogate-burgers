@@ -1,0 +1,106 @@
+{
+  "device": "mps",
+  "rom_modes": 8,
+  "deim_m": 16,
+  "mlp_param_count": 363648,
+  "fno_param_count": 137108,
+  "in_distribution": {
+    "rom": {
+      "mean": 0.00151767546631163,
+      "std": 0.0007743113201967274,
+      "n": 40
+    },
+    "deim_rom": {
+      "mean": 0.0435338568611769,
+      "std": 0.09344363162768042,
+      "n": 40
+    },
+    "mlp": {
+      "mean": 0.007879248011158779,
+      "std": 0.003660749634168328,
+      "n": 40
+    },
+    "fno": {
+      "mean": 0.028641213476657868,
+      "std": 0.014255855515356507,
+      "n": 40
+    }
+  },
+  "parameter_extrapolation": [
+    {
+      "label": "A above training range (2.5 > 2.0)",
+      "A": 2.5,
+      "nu": 0.05,
+      "rom_err": 0.001024791388772428,
+      "deim_rom_err": 0.19956021010875702,
+      "mlp_err": 0.05448559671640396,
+      "fno_err": 0.06128718703985214
+    },
+    {
+      "label": "nu above training range (0.15 > 0.10)",
+      "A": 1.0,
+      "nu": 0.15,
+      "rom_err": 0.0024006925523281097,
+      "deim_rom_err": 0.0023722557816654444,
+      "mlp_err": 0.030478499829769135,
+      "fno_err": 0.06717024743556976
+    },
+    {
+      "label": "A below training range (0.2 < 0.5)",
+      "A": 0.2,
+      "nu": 0.05,
+      "rom_err": 0.00059417326701805,
+      "deim_rom_err": 0.0005792260053567588,
+      "mlp_err": 0.5595299601554871,
+      "fno_err": 0.16644510626792908
+    }
+  ],
+  "out_of_family_ic": {
+    "rom": {
+      "mean": 0.016891660541296004,
+      "std": 0.025417545789072016,
+      "n": 20
+    },
+    "deim_rom": {
+      "mean": 0.03110691634938121,
+      "std": 0.0592462707937555,
+      "n": 20
+    },
+    "fno": {
+      "mean": 0.24101869240403176,
+      "std": 0.13947227312846613,
+      "n": 20
+    },
+    "mlp": "N/A (structural): the MLP surrogate's input is the 2-scalar pair (A, nu); a two-mode initial condition has no such representation, so the MLP cannot be evaluated on this test at all -- not merely inaccurately, but not applicable, unlike the FNO/ROM/DEIM-ROM which all accept the actual field."
+  },
+  "temporal_extrapolation_T2": {
+    "rom": {
+      "mean": 0.0016885507648112252,
+      "std": 0.0007129443299374739,
+      "n": 8
+    },
+    "deim_rom": {
+      "mean": 0.031150107533903793,
+      "std": 0.038753322317218224,
+      "n": 8
+    },
+    "mlp": "N/A (structural): fixed output size sized for T=1.0's 20 snapshots cannot represent a T=2.0 trajectory.",
+    "fno": "N/A (structural, same reason as MLP -- this module's FNO is a single-shot full-trajectory regressor, not an autoregressive one-step operator; see src/fno_net.py docstring for why that design was chosen and what capability it deliberately does not test."
+  },
+  "offline_cost_s": {
+    "pod_basis_construction": 0.026804916968103498,
+    "deim_nonlinear_snapshot_collection": 0.10835983301512897,
+    "deim_basis_and_point_selection_at_selected_m": 0.02919483301229775,
+    "mlp_training_200_epochs": 8.23,
+    "fno_training_200_epochs": 18.4955430420232,
+    "note": "ROM/DEIM-ROM offline cost also includes the POD basis construction above (shared with the plain ROM baseline); DEIM adds only the nonlinear-snapshot collection + basis/point-selection rows on top of that shared cost."
+  },
+  "online_cost_ms": {
+    "solver": 7.817404149682261,
+    "rom": 19.196314600412734,
+    "deim_rom": 4.1176833503413945,
+    "mlp": 0.6043625005986542,
+    "fno": 1.667414599796757,
+    "note": "mean of 20 calls, same machine/session as offline timings above; device=mps; NN methods include a single untimed warm-up call before timing (JIT/graph warm-up), matching evaluate_comparison.py's existing methodology."
+  }
+}

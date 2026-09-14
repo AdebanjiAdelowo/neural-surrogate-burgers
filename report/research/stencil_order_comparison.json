@@ -1,0 +1,68 @@
+{
+  "deim_m": 16,
+  "orders_compared": [
+    2,
+    4
+  ],
+  "in_distribution": {
+    "order_2": {
+      "mean": 0.0435338568611769,
+      "std": 0.09344363162768042,
+      "max": 0.5236359238624573,
+      "n": 40
+    },
+    "order_4": {
+      "mean": 0.04487233674153686,
+      "std": 0.09704860613219678,
+      "max": 0.5463433265686035,
+      "n": 40
+    }
+  },
+  "parameter_extrapolation": [
+    {
+      "label": "A above training range (2.5 > 2.0)",
+      "order_2_err": 0.19956021010875702,
+      "order_4_err": 0.20562581717967987
+    },
+    {
+      "label": "nu above training range (0.15 > 0.10)",
+      "order_2_err": 0.0023722557816654444,
+      "order_4_err": 0.00239682849496603
+    },
+    {
+      "label": "A below training range (0.2 < 0.5)",
+      "order_2_err": 0.0005792260053567588,
+      "order_4_err": 0.0005922163254581392
+    }
+  ],
+  "out_of_family_ic": {
+    "order_2": {
+      "mean": 0.03110691634938121,
+      "std": 0.0592462707937555,
+      "max": 0.2667466402053833,
+      "n": 20
+    },
+    "order_4": {
+      "mean": 0.031236305995844305,
+      "std": 0.05901693483028074,
+      "max": 0.26531535387039185,
+      "n": 20
+    }
+  },
+  "worst_case_steep_gradient": [
+    {
+      "label": "worst in-distribution case (A=1.889, nu=0.0158)",
+      "order_2_err": 0.52358478307724,
+      "order_4_err": 0.5464339852333069
+    },
+    {
+      "label": "2nd-worst (A=1.503, nu=0.0122)",
+      "order_2_err": 0.23393641412258148,
+      "order_4_err": 0.24337904155254364
+    }
+  ],
+  "online_cost_ms": {
+    "order_2": 4.782962499302812,
+    "order_4": 7.408435401157476
+  }
+}
