@@ -1,0 +1,92 @@
+{
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "in_distribution": {
+    "mean_across_seeds": 0.02930869362317026,
+    "std_across_seeds": 0.0009704413661493441,
+    "per_seed": [
+      0.028641213476657868,
+      0.030680936155840756,
+      0.02860393123701215
+    ]
+  },
+  "out_of_family_ic": {
+    "mean_across_seeds": 0.23406378719955687,
+    "std_across_seeds": 0.0052744896459825325,
+    "per_seed": [
+      0.24101869240403176,
+      0.2329213574528694,
+      0.22825131174176932
+    ]
+  },
+  "parameter_extrapolation": {
+    "A above (2.5)": {
+      "mean_across_seeds": 0.06167730068167051,
+      "std_across_seeds": 0.0009275073941541145,
+      "per_seed": [
+        0.06128718703985214,
+        0.06078780069947243,
+        0.06295691430568695
+      ]
+    },
+    "nu above (0.15)": {
+      "mean_across_seeds": 0.0647454634308815,
+      "std_across_seeds": 0.0018590278609741842,
+      "per_seed": [
+        0.06717024743556976,
+        0.06265313178300858,
+        0.06441301107406616
+      ]
+    },
+    "A below (0.2)": {
+      "mean_across_seeds": 0.12022475649913152,
+      "std_across_seeds": 0.033434888693332436,
+      "per_seed": [
+        0.16644510626792908,
+        0.10575154423713684,
+        0.08847761899232864
+      ]
+    }
+  },
+  "per_seed_detail": {
+    "0": {
+      "best_val_loss": 0.0005367102567106485,
+      "in_distribution_mean": 0.028641213476657868,
+      "in_distribution_std": 0.014255855515356507,
+      "out_of_family_ic_mean": 0.24101869240403176,
+      "out_of_family_ic_std": 0.13947227312846613,
+      "parameter_extrapolation": {
+        "A above (2.5)": 0.06128718703985214,
+        "nu above (0.15)": 0.06717024743556976,
+        "A below (0.2)": 0.16644510626792908
+      }
+    },
+    "1": {
+      "best_val_loss": 0.0005331271095201373,
+      "in_distribution_mean": 0.030680936155840756,
+      "in_distribution_std": 0.016480728529526225,
+      "out_of_family_ic_mean": 0.2329213574528694,
+      "out_of_family_ic_std": 0.13868470671277222,
+      "parameter_extrapolation": {
+        "A above (2.5)": 0.06078780069947243,
+        "nu above (0.15)": 0.06265313178300858,
+        "A below (0.2)": 0.10575154423713684
+      }
+    },
+    "2": {
+      "best_val_loss": 0.00048610789235681295,
+      "in_distribution_mean": 0.02860393123701215,
+      "in_distribution_std": 0.016494416902366114,
+      "out_of_family_ic_mean": 0.22825131174176932,
+      "out_of_family_ic_std": 0.13632921034303755,
+      "parameter_extrapolation": {
+        "A above (2.5)": 0.06295691430568695,
+        "nu above (0.15)": 0.06441301107406616,
+        "A below (0.2)": 0.08847761899232864
+      }
+    }
+  }
+}

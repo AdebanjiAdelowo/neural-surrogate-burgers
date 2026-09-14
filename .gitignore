@@ -6,6 +6,8 @@ venv/
 data/*.npy
 data/*.npz
 experiments/outputs/
+experiments/*.npz
+experiments/*_run_meta*.json
 *.pt
 *.pth
 .DS_Store
