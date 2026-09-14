@@ -418,14 +418,21 @@ $A=0.2$ extrapolation case shows more inter-seed variability (std $\pm$3.34 perc
 
 ## 14. Results (final, post-review; `report/research/results.json` is the machine-readable source)
 
+**Note on "$\pm$" in this section**: for POD-ROM, DEIM/local-FD-ROM, and MLP (deterministic given
+fixed data -- no training-seed variability applies), "$\pm$" denotes the standard deviation
+*across the $n$ test examples* in that row's split. For FNO, "$\pm$" denotes the standard
+deviation *across the 3 training seeds* (Section 13) -- a different quantity, not directly
+comparable to the other rows' example-to-example spread. Rows are labelled explicitly where both
+a single-seed and a multi-seed figure are given.
+
 ### 14.1 In-distribution accuracy (test split, $n=40$) -- unchanged from revision 1, re-verified
 
-| Method | Relative $L^2$ error (mean $\pm$ std) |
+| Method | Relative $L^2$ error |
 |---|---|
-| POD-ROM ($r=8$) | 0.152% $\pm$ 0.077% |
-| **DEIM/local-FD-ROM ($m=16$)** | **4.35% $\pm$ 9.34%** |
-| MLP surrogate | 0.79% $\pm$ 0.37% |
-| FNO (seed 0; 2.93% $\pm$ 0.10% across 3 seeds) | 2.86% |
+| POD-ROM ($r=8$) | 0.152% $\pm$ 0.077% (std across 40 test examples) |
+| **DEIM/local-FD-ROM ($m=16$)** | **4.35% $\pm$ 9.34% (std across 40 test examples)** |
+| MLP surrogate | 0.79% $\pm$ 0.37% (std across 40 test examples) |
+| FNO | 2.93% $\pm$ 0.10% (3-seed mean $\pm$ std across seeds; seed 0 alone: 2.86%) |
 
 ### 14.2 Parameter extrapolation
 
