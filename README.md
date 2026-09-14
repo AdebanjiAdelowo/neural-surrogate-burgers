@@ -192,16 +192,25 @@ operator-learning architectures such as FNO or DeepONet, uncertainty quantificat
 to higher-dimensional PDEs.
 
 **Status:** a hybrid DEIM/local finite-difference hyper-reduction scheme, plus an FNO comparison,
-has been implemented and undergone a self-review scrutiny pass (correcting one imprecise
-terminology claim, hedging the novelty claim, and retracting one unsupported causal explanation)
-on the `research/rom-deim-fno-burgers` branch (not yet merged into `main` as of this writing) --
-see [`RESEARCH_EXTENSION.md`](RESEARCH_EXTENSION.md) on that branch for the full write-up,
+has been implemented, undergone a self-review scrutiny pass (correcting one imprecise terminology
+claim, hedging the novelty claim, and retracting one unsupported causal explanation), and merged
+into `main` -- see [`RESEARCH_EXTENSION.md`](RESEARCH_EXTENSION.md) for the full write-up,
 including an approximately 2x online speedup of the ROM over the full solver via hyper-reduction
 on the documented benchmark hardware/configuration (at a real, only partially-understood
 steep-gradient accuracy cost that a higher-order stencil does not fix -- a genuine negative
 result), and a seed-stable (3 seeds) structural finding that an FNO's architectural capacity to
 accept arbitrary initial-condition fields does not by itself confer out-of-family generalisation
 given this project's data budget.
+
+## Remaining Work
+
+Open research questions, not bugs (see `RESEARCH_EXTENSION.md`, "Limitations"): a deeper
+explanation of why the DEIM-Galerkin reduction operator's norm is non-monotonic in rank; the root
+cause of the steep-gradient DEIM accuracy degradation (a higher-order stencil ruled out truncation
+order specifically; a Gibbs-phenomenon-style hypothesis remains untested); and whether broader FNO
+training distributions or an autoregressive architecture improve out-of-family generalisation.
+Portfolio-wide project status is tracked centrally in the author's Selected Projects
+documentation; this project's status there is COMPLETE / DEFERRED RESEARCH.
 
 ## References
 
