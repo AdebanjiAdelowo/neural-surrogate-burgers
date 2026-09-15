@@ -15,7 +15,7 @@ Not implemented: an implicit/exact Cole-Hopf semi-analytical solution (Burgers a
 IC, but it requires its own numerical integration and was judged not worth the extra implementation
 risk for this MVP). Verification instead uses grid-refinement convergence, the two exact conserved
 quantities of the periodic problem (mass, and energy dissipation direction), and a physically
-expected steepening-location check — see IMPLEMENTATION_LOG.md Stage "solver validation".
+expected steepening-location check.
 """
 
 import numpy as np

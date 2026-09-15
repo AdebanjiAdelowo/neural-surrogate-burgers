@@ -1,9 +1,8 @@
 # Architecture — Neural Surrogate vs. POD-Galerkin ROM for Burgers' Equation
 
-**Status: MVP implemented and verified** — see `IMPLEMENTATION_LOG.md` for the stage-by-stage
-record and `report/mvp_results.txt` for real results. Not implemented (explicit MVP stop
-condition): FNO/DeepONet comparison (§9 extension point), multi-dimensional PDEs, uncertainty
-quantification, hyper-reduction of the ROM's nonlinear term.
+See the README for results. Hyper-reduction (DEIM) and an FNO comparison are implemented and
+documented in the README's "Hyper-Reduction and FNO Extension" section; not implemented:
+DeepONet comparison, multi-dimensional PDEs, uncertainty quantification.
 
 ## 1. Research problem
 

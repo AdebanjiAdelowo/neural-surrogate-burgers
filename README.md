@@ -56,9 +56,10 @@ splits (checked programmatically at generation time). Data files are generated l
 committed to the repository.
 
 **POD-ROM:** the basis is built from the training snapshot ensemble; `r = 8` modes are used for the
-comparison. This problem family is highly linearly compressible (prediction error decreases
-monotonically with retained modes and is near zero by `r >= 16`), so `r = 8` is a deliberately
-non-trivial accuracy baseline rather than the easiest possible case for the ROM.
+comparison. This problem family is highly linearly compressible: mean relative $L^2$ error on a
+held-out test parameter drops from 7.55% at `r = 2` to 2.23% at `r = 4` to 0.076% at `r = 8`, and is
+near zero by `r >= 16`. `r = 8` is therefore a deliberately non-trivial accuracy baseline rather
+than the easiest possible case for the ROM.
 
 **Neural surrogate training** (`scripts/train_surrogate.py`): a 3-hidden-layer MLP (width 128)
 trained for 200 epochs with batch size 16 and the Adam optimiser (`lr = 1e-3`).
@@ -185,32 +186,34 @@ shape and finiteness).
 - All results were produced on laptop-scale hardware (Apple MPS backend); no distributed or HPC
   benchmarking was performed.
 
+## Hyper-Reduction and FNO Extension
+
+A DEIM/local-finite-difference hyper-reduced POD-Galerkin ROM and a 1D Fourier Neural Operator
+(FNO) baseline were added on top of the plain ROM and MLP surrogate above. Full derivation,
+methodology, and reproduction steps are in [`RESEARCH_EXTENSION.md`](RESEARCH_EXTENSION.md).
+
+**Speedup.** The hyper-reduced ROM (DEIM, rank `r = 8`) runs approximately 4.7-4.9x faster than the
+plain POD-Galerkin ROM and approximately 2.0x faster than the full solver on the documented
+benchmark hardware/configuration, closing the runtime gap noted above.
+
+**Accuracy cost.** This speedup comes with an accuracy cost concentrated in the steep-gradient
+regime (high amplitude, low viscosity): online error rises from the plain ROM's ~0.15% to ~4.35%
+in the worst cases. A higher-order local-derivative stencil was tested as a fix and did not
+resolve the degradation, ruling out truncation order as the dominant error source; the root cause
+is only correlationally identified (steep gradients correlate with larger local finite-difference
+error in the nonlinear term) and remains an open question.
+
+**FNO generalisation.** Across 3 training seeds, the FNO reaches 2.93% ± 0.10% in-distribution
+error, worse than the plain ROM and the DEIM-ROM but on the same order as the MLP surrogate. On a
+held-out initial-condition family never seen during training, the FNO's error is 23.41% ± 0.53%
+(seed-stable), far higher than the ROM family. The finding is specific to this network, training
+budget, and IC family: architectural capacity to accept arbitrary input fields does not by itself
+confer out-of-family generalisation.
+
 ## Possible Extensions
 
-Possible extensions include hyper-reduction (DEIM/EIM) for the ROM, comparison against
-operator-learning architectures such as FNO or DeepONet, uncertainty quantification, and extension
-to higher-dimensional PDEs.
-
-**Status:** a hybrid DEIM/local finite-difference hyper-reduction scheme, plus an FNO comparison,
-has been implemented, undergone a self-review scrutiny pass (correcting one imprecise terminology
-claim, hedging the novelty claim, and retracting one unsupported causal explanation), and merged
-into `main` -- see [`RESEARCH_EXTENSION.md`](RESEARCH_EXTENSION.md) for the full write-up,
-including an approximately 2x online speedup of the ROM over the full solver via hyper-reduction
-on the documented benchmark hardware/configuration (at a real, only partially-understood
-steep-gradient accuracy cost that a higher-order stencil does not fix -- a genuine negative
-result), and a seed-stable (3 seeds) structural finding that an FNO's architectural capacity to
-accept arbitrary initial-condition fields does not by itself confer out-of-family generalisation
-given this project's data budget.
-
-## Remaining Work
-
-Open research questions, not bugs (see `RESEARCH_EXTENSION.md`, "Limitations"): a deeper
-explanation of why the DEIM-Galerkin reduction operator's norm is non-monotonic in rank; the root
-cause of the steep-gradient DEIM accuracy degradation (a higher-order stencil ruled out truncation
-order specifically; a Gibbs-phenomenon-style hypothesis remains untested); and whether broader FNO
-training distributions or an autoregressive architecture improve out-of-family generalisation.
-Portfolio-wide project status is tracked centrally in the author's Selected Projects
-documentation; this project's status there is COMPLETE / DEFERRED RESEARCH.
+Further possible extensions include comparison against DeepONet, uncertainty quantification over
+the fitted models, and extension to higher-dimensional PDEs.
 
 ## References
 
