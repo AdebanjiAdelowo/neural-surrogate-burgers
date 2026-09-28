@@ -148,3 +148,20 @@ def test_reduced_policy_reads_only_stencil_rows_for_deim():
     pois = deim_rom_reduced_trajectory(a0, np.abs(u0).max(), Phi_p, C["M"], C["pts"], 128, 0.05, 1.0, 20)
     assert clean[2] == pois[2]
     np.testing.assert_array_equal(clean[1], pois[1])
+
+
+HISTORICAL_REPRODUCTION_SCRIPTS = ("build_deim.py", "compare_deim_stencil_orders.py", "diagnose_deim_mechanisms.py",
+                                   "evaluate_comparison.py", "evaluate_research_extension.py", "verify_timing.py")
+
+
+@pytest.mark.parametrize("script", HISTORICAL_REPRODUCTION_SCRIPTS)
+def test_scripts_that_reproduce_historical_tables_pin_the_historical_policy(script):
+    # The predictors' default changed to the "reduced" policy; these scripts regenerate published
+    # tables, so both predictors must be pinned to the historical rule.
+    import os
+    import re
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", script)
+    src = open(path).read()
+    for fn in ("rom_predict", "deim_rom_predict"):
+        if re.search(rf"(?<![\w.]){fn}\(", src):  # the script calls this predictor
+            assert f'{fn} = partial({fn}, timestep_policy="historical")' in src, (script, fn)

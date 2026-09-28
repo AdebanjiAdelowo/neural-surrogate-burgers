@@ -142,7 +142,7 @@ neural-surrogate-burgers/
 │   └── timing_numpy_sensitivity.py  DEIM versus full-solver timing under the installed NumPy
 ├── data/                    generated train/val/test splits (not committed)
 ├── experiments/             trained checkpoints (not committed)
-├── tests/                   92 tests
+├── tests/                   98 tests
 └── report/                  evaluation figures and results; report/audit/ holds the JSON behind
                              the hyper-reduction and FNO numbers below
 ```
@@ -180,11 +180,12 @@ python scripts/evaluate_comparison.py
 pytest
 ```
 
-92 tests cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+98 tests cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step
-rules and stability tools, time-aligned snapshot saving, the benchmark and audit code, and the
+rules and stability tools (including a check that scripts reproducing historical tables pin the
+historical rule), time-aligned snapshot saving, the benchmark and audit code, and the
 surrogate network (forward-pass shape and finiteness).
 
 ## Limitations
@@ -227,8 +228,10 @@ Nx = 512 on the first 10 test cases).
 
 **Runtime.** The DEIM/local-FD model uses no FFTs and its per-stage cost does not grow with Nx,
 whereas the full solver is FFT-bound. At the benchmark resolution Nx = 128 their runtime ratio
-therefore depends on the FFT implementation. Averaged over the 40 test cases on one Apple M3 Pro
-(`scripts/timing_numpy_sensitivity.py`):
+therefore depends on the implementation and software environment, and no single speed-up is
+reported. The 40-case benchmark was measured under two NumPy versions on the same Apple M3 Pro
+(`scripts/timing_numpy_sensitivity.py`, `report/audit/timing_numpy_*.json`); both are reported, and
+neither is treated as the reference:
 
 | NumPy | FFT + inverse FFT, n = 128 | DEIM/local-FD vs full solver, historical step rule | revised step rule |
 |---|---|---|---|
@@ -237,11 +240,14 @@ therefore depends on the FFT implementation. Averaged over the 40 test cases on 
 
 Earlier runs under NumPy 2.0.0 gave 1.52x to 1.57x (original timing protocol) and 1.67x and 1.98x
 (time-aligned protocol, historical and revised rules). The about 2.0x previously quoted was a single
-test case. The advantage grows with resolution under either NumPy version. With the revised rule, on
-two test cases (a steep one, A = 1.92 and nu = 0.038, and a smooth one, A = 0.86 and nu = 0.098), it
-is 2.5x at Nx = 1024 and 3.7x to 5.8x at Nx = 2048 with NumPy 1.26.4
-(`followup_production_validation_run1.json`), and 4.1x and 6.2x to 7.1x with NumPy 2.0.0
-(`followup_scaling2_run1.json`). The plain ROM is 0.35x to 0.41x the speed of the full solver at
+test case.
+
+*Two-case scaling check (separate from the 40-case benchmark).* On two test cases only (a steep one,
+A = 1.92 and nu = 0.038, and a smooth one, A = 0.86 and nu = 0.098), the DEIM/local-FD advantage with
+the revised rule grows with resolution under both NumPy versions: 2.5x at Nx = 1024 and 3.7x to 5.8x
+at Nx = 2048 with NumPy 1.26.4 (`followup_production_validation_run1.json`), and 4.1x and 6.2x to 7.1x
+with NumPy 2.0.0 (`followup_scaling2_run1.json`). Two cases indicate the trend but are not a
+workload average. The plain ROM is 0.35x to 0.41x the speed of the full solver at
 Nx = 128 (NumPy 2.0.0).
 
 **Time-step rule.** The historical reduced-model rule `dt = min(0.25 dx / max|u0|, 0.4 dx^2 / (2 nu))`
@@ -249,9 +255,16 @@ carries the full-grid resolution into a system with eight degrees of freedom, so
 about as Nx². The revised rule `dt = min(0.25 dx / max|u0|, 0.5 * 2.785 / (nu * rho(K)))`, with
 `rho(K)` the spectral radius of the reduced diffusion operator (2.785 is RK4's real-axis stability
 limit, 0.5 a fixed safety factor), gives errors identical to the historical rule on all 40 validation
-and 40 test cases (largest per-case difference 3e-7), with every case stable. It is the default of
-`rom_predict` and `deim_rom_predict`; the scripts that reproduce the historical tables pass
-`timestep_policy="historical"`. Using the full solver's step count with no diffusion bound is unstable
+and 40 test cases (largest per-case difference 3e-7), with every case stable
+(`report/audit/followup_production_validation_run1.json`).
+
+*Behaviour change.* The revised rule is now the default of `rom_predict` and `deim_rom_predict`
+(`timestep_policy="reduced"`); the historical rule remains available as
+`timestep_policy="historical"`. Every script that regenerates an earlier table (`evaluate_comparison.py`,
+`evaluate_research_extension.py`, `build_deim.py`, `verify_timing.py`, `compare_deim_stencil_orders.py`,
+`diagnose_deim_mechanisms.py`) pins the historical rule, and a test enforces this, so the historical
+results are unchanged. Code calling the predictors directly takes fewer steps at the same accuracy on
+the tested cases. Using the full solver's step count with no diffusion bound is unstable
 at nu = 0.15; the revised rule is stable there.
 
 **FNO.** The FNO originally received only the initial field, not the viscosity, so no model of that
