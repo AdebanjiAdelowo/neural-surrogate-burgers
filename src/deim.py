@@ -45,6 +45,10 @@ Section "DEIM validation" for the resulting numbers.
 
 import numpy as np
 
+from src.snapshot_times import align_step_count
+from src.timestep import (DEFAULT_POLICY, check_policy, historical_dt, reduced_diffusion_matrix_deim,
+                          reduced_dt, spectral_radius)
+
 
 def collect_nonlinear_snapshots(u_ensemble: np.ndarray, k: np.ndarray, nu_values: np.ndarray,
                                  dealias: np.ndarray) -> np.ndarray:
@@ -191,21 +195,33 @@ def deim_nonlinear_at_points_4th_order(a: np.ndarray, Phi_support: np.ndarray, s
     return -u_0 * ux + nu * uxx
 
 
-def deim_rom_predict(u0: np.ndarray, Phi: np.ndarray, M: np.ndarray, points: np.ndarray,
-                      Nx: int, nu: float, T: float, n_save: int, dt: float = None,
-                      stencil_order: int = 2):
-    """DEIM-hyper-reduced POD-Galerkin prediction -- drop-in analogue of src.pod_rom.rom_predict,
-    but the nonlinear term is never evaluated on the full grid.
+def deim_rom_reduced_trajectory(a0: np.ndarray, u0_max, Phi: np.ndarray, M: np.ndarray,
+                                 points: np.ndarray, Nx: int, nu: float, T: float, n_save: int,
+                                 dt: float = None, stencil_order: int = 2,
+                                 align_snapshots: bool = False, min_steps: int = None,
+                                 timestep_policy: str = DEFAULT_POLICY,
+                                 diffusion_radius: float = None):
+    """Time-step the DEIM/local-FD hyper-reduced ODE from reduced initial coordinates a0.
+
+    This is the "solver-only" online path of `deim_rom_predict`: no initial projection and no
+    final reconstruction onto the full grid. `Phi` is read ONLY through `Phi[support, :]`, the rows
+    on the DEIM points' stencil support (at most (2*halfwidth+1)*m of the Nx rows), so nothing in
+    the time-stepping loop touches the full grid (see tests/test_hyperreduction_audit.py, which
+    poisons every other row of Phi with NaN and checks the trajectory is unchanged).
 
     Args:
-        stencil_order: 2 (default, original/baseline -- 3-point central differences) or 4
-            (5-point central differences, see `deim_nonlinear_at_points_4th_order`). Default
-            preserves the exact original behaviour of every existing caller.
+        a0: (r,) reduced initial coordinates, Phi.T @ u0.
+        u0_max: max|u0| of the full-grid initial condition (sets the advective step bound; passed
+            through unchanged from the caller so `deim_rom_predict` stays bit-identical).
+        dt, align_snapshots, min_steps, timestep_policy: as in src.pod_rom.rom_reduced_trajectory. The
+        "reduced" policy (default) uses the spectral radius of THIS model's reduced diffusion operator
+        (local-FD stencil of the given order); "historical" is the original full-grid rule.
+        diffusion_radius: precomputed rho(K) for the "reduced" policy (computed if None).
 
     Returns:
-        t_save: (n_save,), u_pred: (n_save, Nx) reconstructed physical-space predictions.
+        t_save: (n_save,), a_save: (n_save, r) reduced states, n_steps: RK4 steps taken.
     """
-    a = Phi.T @ u0
+    a = a0
     dx = (2 * np.pi) / Nx
     halfwidth = 1 if stencil_order == 2 else 2
     support, neighbours = _stencil_support(points, Nx, halfwidth=halfwidth)
@@ -220,11 +236,18 @@ def deim_rom_predict(u0: np.ndarray, Phi: np.ndarray, M: np.ndarray, points: np.
     # against spectral ground truth) are left as-is, unaffected by this optimisation.
     idx_in_support = np.searchsorted(support, neighbours)  # (m, 3) or (m, 5)
 
+    check_policy(timestep_policy)
     if dt is None:
-        dt_advective = 0.25 * dx / (np.abs(u0).max() + 1e-8)
-        dt_diffusive = 0.4 * dx**2 / (2 * nu + 1e-12)
-        dt = min(dt_advective, dt_diffusive)
-    n_steps = max(4 * n_save, int(np.ceil(T / dt)))
+        if timestep_policy == "historical":
+            dt = historical_dt(u0_max, Nx, nu)
+        else:
+            rho = (spectral_radius(reduced_diffusion_matrix_deim(Phi, M, points, Nx,
+                                                                 stencil_order=stencil_order))
+                   if diffusion_radius is None else diffusion_radius)
+            dt = reduced_dt(u0_max, Nx, nu, rho)
+    n_steps = max(4 * n_save if min_steps is None else min_steps, int(np.ceil(T / dt)))
+    if align_snapshots:
+        n_steps = align_step_count(n_steps, n_save)
     dt = T / n_steps
     save_steps = set(np.linspace(0, n_steps, n_save, dtype=int).tolist())
 
@@ -265,9 +288,32 @@ def deim_rom_predict(u0: np.ndarray, Phi: np.ndarray, M: np.ndarray, points: np.
             a_save.append(a.copy())
             t_save.append(t)
 
-    a_save = np.array(a_save)
+    return np.array(t_save), np.array(a_save), n_steps
+
+
+def deim_rom_predict(u0: np.ndarray, Phi: np.ndarray, M: np.ndarray, points: np.ndarray,
+                      Nx: int, nu: float, T: float, n_save: int, dt: float = None,
+                      stencil_order: int = 2, align_snapshots: bool = False,
+                      min_steps: int = None, timestep_policy: str = DEFAULT_POLICY,
+                      diffusion_radius: float = None):
+    """DEIM-hyper-reduced POD-Galerkin prediction -- drop-in analogue of src.pod_rom.rom_predict,
+    but the nonlinear term is never evaluated on the full grid.
+
+    Args:
+        stencil_order: 2 (default, original/baseline -- 3-point central differences) or 4
+            (5-point central differences, see `deim_nonlinear_at_points_4th_order`). Default
+            preserves the exact original behaviour of every existing caller.
+
+    Returns:
+        t_save: (n_save,), u_pred: (n_save, Nx) reconstructed physical-space predictions.
+    """
+    a = Phi.T @ u0
+    t_save, a_save, _ = deim_rom_reduced_trajectory(a, np.abs(u0).max(), Phi, M, points, Nx, nu,
+                                                     T, n_save, dt, stencil_order,
+                                                     align_snapshots, min_steps,
+                                                     timestep_policy, diffusion_radius)
     u_pred = a_save @ Phi.T  # (n_save, Nx) -- reconstruction is O(n_save * r * Nx), same as
     # the plain ROM's reconstruction cost; only the *time-stepping* RHS evaluations are hyper-
     # reduced. This matches how DEIM speed-ups are conventionally reported in the literature
     # (the online RHS-evaluation cost, not final-output reconstruction).
-    return np.array(t_save), u_pred.astype(np.float32)
+    return t_save, u_pred.astype(np.float32)

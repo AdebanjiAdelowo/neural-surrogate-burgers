@@ -33,6 +33,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+NU_LOW, NU_HIGH = 0.01, 0.1  # training viscosity range (scripts/generate_dataset.NU_RANGE)
+
 
 class SpectralConv1d(nn.Module):
     """1D spectral convolution: rfft -> truncate to `modes` low frequencies -> learned complex
@@ -89,15 +91,20 @@ class FNO1d(nn.Module):
     objective is a fair comparison of architecture/input-representation type, not a capacity race.
     """
 
-    def __init__(self, Nx: int, n_save: int, modes: int = 16, width: int = 32, n_layers: int = 4):
+    def __init__(self, Nx: int, n_save: int, modes: int = 16, width: int = 32, n_layers: int = 4,
+                 use_nu: bool = False):
         super().__init__()
         self.Nx = Nx
         self.n_save = n_save
+        # use_nu=False (default) is the historical, viscosity-BLIND network: input [u0(x), x]. With
+        # use_nu=True the only change is one extra input channel carrying the normalised viscosity
+        # broadcast over the grid ([u0(x), x, nu_norm]); depth, modes, width and head are identical.
+        self.use_nu = use_nu
         # Lift: [u0(x), x] -> width channels. Including the coordinate x as a second input channel
         # is standard FNO practice (Li et al. 2021 Appendix): the network is otherwise translation-
         # invariant by construction (spectral convs), so x must be given explicitly if the periodic
         # domain's absolute position matters (it does here, since the IC's phase varies).
-        self.lift = nn.Conv1d(2, width, kernel_size=1)
+        self.lift = nn.Conv1d(3 if use_nu else 2, width, kernel_size=1)
         self.blocks = nn.ModuleList([FNOBlock(width, modes) for _ in range(n_layers)])
         self.project = nn.Sequential(
             nn.Conv1d(width, width, kernel_size=1), nn.GELU(),
@@ -106,12 +113,24 @@ class FNO1d(nn.Module):
         x_grid = torch.linspace(0, 1, Nx + 1)[:-1]
         self.register_buffer("x_grid", x_grid)
 
-    def forward(self, u0: torch.Tensor) -> torch.Tensor:
-        # u0: (batch, Nx) -- the actual initial-condition field, not scalar parameters.
+    def build_input(self, u0: torch.Tensor, nu: torch.Tensor = None) -> torch.Tensor:
+        """Network input (batch, 2 or 3, Nx): [u0(x), x] and, if use_nu, [.., nu_norm(broadcast)].
+        nu is the RAW viscosity (batch,); it is normalised with the same convention as the MLP
+        surrogate (scripts/train_surrogate.normalize_params): (nu - 0.01) / (0.1 - 0.01)."""
         batch = u0.shape[0]
         x_grid = self.x_grid.unsqueeze(0).expand(batch, -1)  # (batch, Nx)
-        h = torch.stack([u0, x_grid], dim=1)  # (batch, 2, Nx)
-        h = self.lift(h)
+        channels = [u0, x_grid]
+        if self.use_nu:
+            if nu is None:
+                raise ValueError("this FNO was built with use_nu=True: pass the viscosity nu")
+            nu_norm = (nu.to(u0.dtype).reshape(batch, 1) - NU_LOW) / (NU_HIGH - NU_LOW)
+            channels.append(nu_norm.expand(-1, u0.shape[1]))
+        return torch.stack(channels, dim=1)
+
+    def forward(self, u0: torch.Tensor, nu: torch.Tensor = None) -> torch.Tensor:
+        # u0: (batch, Nx) -- the actual initial-condition field, not scalar parameters. nu is only
+        # read when the network was built with use_nu=True.
+        h = self.lift(self.build_input(u0, nu))
         for block in self.blocks:
             h = block(h)
         out = self.project(h)  # (batch, n_save, Nx)

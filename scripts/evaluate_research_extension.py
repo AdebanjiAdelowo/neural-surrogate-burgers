@@ -48,6 +48,13 @@ from src.pod_rom import rom_predict
 from src.solver import solve_burgers
 from src.surrogate_net import BurgersSurrogateMLP
 
+# Historical protocol: this script reproduces published numbers, so it pins the historical time-step
+# rule (the predictors' default is now the reduced-operator policy; see src/timestep.py).
+from functools import partial  # noqa: E402
+
+deim_rom_predict = partial(deim_rom_predict, timestep_policy="historical")
+rom_predict = partial(rom_predict, timestep_policy="historical")
+
 ROM_MODES = 8
 N_TIMING_REPEATS = 20
 

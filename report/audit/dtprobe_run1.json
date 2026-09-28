@@ -1,0 +1,273 @@
+{
+ "config": {
+  "Nx": 128,
+  "T": 1.0,
+  "n_save": 20,
+  "A_range": [
+   0.5,
+   2.0
+  ],
+  "nu_range": [
+   0.01,
+   0.1
+  ],
+  "split_sizes": {
+   "train": 200,
+   "val": 40,
+   "test": 40
+  },
+  "split_seed_offsets": {
+   "train": 0,
+   "val": 100000,
+   "test": 200000
+  },
+  "r": 8,
+  "m": 16,
+  "stencil_order": 2
+ },
+ "cases": [
+  {
+   "Nx": 128,
+   "i": 0,
+   "A": 1.9218051433563232,
+   "nu": 0.03825710341334343,
+   "n_steps_fom": 157,
+   "n_steps_native": 157,
+   "native_rule": {
+    "rom_err": 0.0007668156758882105,
+    "deim_err": 0.11350920051336288,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 7.824707999999999,
+     "rom": 20.974167,
+     "deim": 4.578625000000001
+    },
+    "deim_speedup_vs_fom": 1.708964590897922,
+    "rom_speedup_vs_fom": 0.3730640649519001
+   },
+   "fom_step_count": {
+    "rom_err": 0.0007668156758882105,
+    "deim_err": 0.11350920051336288,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 7.959125000000001,
+     "rom": 21.402291,
+     "deim": 4.685792
+    },
+    "deim_speedup_vs_fom": 1.6985655786684515,
+    "rom_speedup_vs_fom": 0.3718819167536784
+   }
+  },
+  {
+   "Nx": 128,
+   "i": 13,
+   "A": 0.855753481388092,
+   "nu": 0.09839369356632233,
+   "n_steps_fom": 80,
+   "n_steps_native": 205,
+   "native_rule": {
+    "rom_err": 0.0004673642397392541,
+    "deim_err": 0.0004672653740271926,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 4.060459000000001,
+     "rom": 25.703791,
+     "deim": 5.556625
+    },
+    "deim_speedup_vs_fom": 0.7307419521742066,
+    "rom_speedup_vs_fom": 0.1579712113283212
+   },
+   "fom_step_count": {
+    "rom_err": 0.00046736488002352417,
+    "deim_err": 0.0004672447103075683,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 4.088583000000001,
+     "rom": 11.778792000000001,
+     "deim": 2.6127920000000002
+    },
+    "deim_speedup_vs_fom": 1.5648329449875844,
+    "rom_speedup_vs_fom": 0.3471139485271495
+   }
+  },
+  {
+   "Nx": 128,
+   "i": 29,
+   "A": 0.6572070717811584,
+   "nu": 0.025901207700371742,
+   "n_steps_fom": 80,
+   "n_steps_native": 80,
+   "native_rule": {
+    "rom_err": 0.00030463901930488646,
+    "deim_err": 0.00030441946000792086,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 4.099292,
+     "rom": 11.823291000000001,
+     "deim": 2.627667
+    },
+    "deim_speedup_vs_fom": 1.5600500367816774,
+    "rom_speedup_vs_fom": 0.3467132797458846
+   },
+   "fom_step_count": {
+    "rom_err": 0.00030463901930488646,
+    "deim_err": 0.00030441946000792086,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 4.1094170000000005,
+     "rom": 11.903791,
+     "deim": 2.5744170000000004
+    },
+    "deim_speedup_vs_fom": 1.5962515008252354,
+    "rom_speedup_vs_fom": 0.345219182695664
+   }
+  },
+  {
+   "Nx": 1024,
+   "i": 0,
+   "A": 1.9218051433563232,
+   "nu": 0.03825710341334343,
+   "n_steps_fom": 1253,
+   "n_steps_native": 5081,
+   "native_rule": {
+    "rom_err": 0.0015851507196202874,
+    "deim_err": 0.0026075011119246483,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 131.61075,
+     "rom": 1471.753917,
+     "deim": 135.22691700000001
+    },
+    "deim_speedup_vs_fom": 0.9732585266289845,
+    "rom_speedup_vs_fom": 0.08942442651572709
+   },
+   "fom_step_count": {
+    "rom_err": 0.0015851507196202874,
+    "deim_err": 0.0026077632792294025,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 131.732291,
+     "rom": 361.152375,
+     "deim": 33.642334000000005
+    },
+    "deim_speedup_vs_fom": 3.915670387197273,
+    "rom_speedup_vs_fom": 0.3647554332156891
+   }
+  },
+  {
+   "Nx": 1024,
+   "i": 13,
+   "A": 0.855753481388092,
+   "nu": 0.09839369356632233,
+   "n_steps_fom": 558,
+   "n_steps_native": 13068,
+   "native_rule": {
+    "rom_err": 0.0004972489550709724,
+    "deim_err": 0.0005779661005362868,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 57.925333,
+     "rom": 3835.940583,
+     "deim": 347.389084
+    },
+    "deim_speedup_vs_fom": 0.16674482782539016,
+    "rom_speedup_vs_fom": 0.015100685671908386
+   },
+   "fom_step_count": {
+    "rom_err": 0.0004972489550709724,
+    "deim_err": 0.0005777894402854145,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 58.187292,
+     "rom": 166.123625,
+     "deim": 15.265083
+    },
+    "deim_speedup_vs_fom": 3.811790083290081,
+    "rom_speedup_vs_fom": 0.3502650029458483
+   }
+  },
+  {
+   "Nx": 1024,
+   "i": 29,
+   "A": 0.6572070717811584,
+   "nu": 0.025901207700371742,
+   "n_steps_fom": 429,
+   "n_steps_native": 3440,
+   "native_rule": {
+    "rom_err": 0.0003233114839531481,
+    "deim_err": 0.00037284212885424495,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 44.57825,
+     "rom": 1000.4200410000002,
+     "deim": 91.766417
+    },
+    "deim_speedup_vs_fom": 0.48577956356299706,
+    "rom_speedup_vs_fom": 0.04455953316912809
+   },
+   "fom_step_count": {
+    "rom_err": 0.0003233114839531481,
+    "deim_err": 0.00037305147270672023,
+    "rom_finite": true,
+    "deim_finite": true,
+    "median_ms": {
+     "fom": 44.950042,
+     "rom": 126.83487500000001,
+     "deim": 11.602459000000001
+    },
+    "deim_speedup_vs_fom": 3.8741823608254076,
+    "rom_speedup_vs_fom": 0.3543981259097705
+   }
+  }
+ ],
+ "purpose": "diagnose the step-count limit; default step rule of src/ is NOT changed",
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.12.2",
+  "numpy": "2.0.0",
+  "scipy": "1.13.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "5f61d788a3398b399484678f56ce683c09c9d0a5",
+  "git_dirty_paths": 7,
+  "loadavg_start": [
+   5.9892578125,
+   6.46337890625,
+   4.72314453125
+  ],
+  "top_cpu_processes_start": [
+   "20.4 python",
+   " 17.4 WindowServer",
+   " 13.3 Code Helper (Renderer)",
+   "  8.8 coreaudiod",
+   "  8.6 Code Helper"
+  ],
+  "power": "Now drawing from 'Battery Power'",
+  "torch": "2.11.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "loadavg_end": [
+   5.69970703125,
+   6.3603515625,
+   4.7861328125
+  ]
+ }
+}

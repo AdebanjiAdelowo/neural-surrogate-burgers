@@ -1,0 +1,384 @@
+{
+ "aligned_data": true,
+ "variants": {
+  "blind_rerun": {
+   "per_seed": [
+    {
+     "seed": 0,
+     "in_dist": {
+      "n": 40,
+      "n_nonfinite": 0,
+      "mean": 0.028767374926246703,
+      "std": 0.014347926190894502,
+      "median": 0.025086472742259502,
+      "p90": 0.04451048448681832,
+      "max": 0.07462727278470993,
+      "n_above_1pct": 39,
+      "n_above_10pct": 0
+     },
+     "out_of_family": {
+      "n": 20,
+      "n_nonfinite": 0,
+      "mean": 0.24089555069804192,
+      "std": 0.13938074405265008,
+      "median": 0.23723658919334412,
+      "p90": 0.3865055739879608,
+      "max": 0.6349707841873169,
+      "n_above_1pct": 20,
+      "n_above_10pct": 17
+     },
+     "best_epoch": 146,
+     "best_val_mse": 0.0005405887495726347,
+     "train_time_s": 29.066641250043176,
+     "param_count": 137108
+    },
+    {
+     "seed": 1,
+     "in_dist": {
+      "n": 40,
+      "n_nonfinite": 0,
+      "mean": 0.030892306193709373,
+      "std": 0.0165277558993011,
+      "median": 0.023472068831324577,
+      "p90": 0.050962479040026674,
+      "max": 0.07972954958677292,
+      "n_above_1pct": 39,
+      "n_above_10pct": 0
+     },
+     "out_of_family": {
+      "n": 20,
+      "n_nonfinite": 0,
+      "mean": 0.23314399905502797,
+      "std": 0.13894636136390748,
+      "median": 0.2321334183216095,
+      "p90": 0.37631627023220066,
+      "max": 0.6364948749542236,
+      "n_above_1pct": 20,
+      "n_above_10pct": 16
+     },
+     "best_epoch": 161,
+     "best_val_mse": 0.0005395979387685657,
+     "train_time_s": 24.048555374960415,
+     "param_count": 137108
+    },
+    {
+     "seed": 2,
+     "in_dist": {
+      "n": 40,
+      "n_nonfinite": 0,
+      "mean": 0.028718404145911335,
+      "std": 0.016537264014582314,
+      "median": 0.021508467383682728,
+      "p90": 0.04922208264470101,
+      "max": 0.07757889479398727,
+      "n_above_1pct": 38,
+      "n_above_10pct": 0
+     },
+     "out_of_family": {
+      "n": 20,
+      "n_nonfinite": 0,
+      "mean": 0.22834651451557875,
+      "std": 0.1363177646818139,
+      "median": 0.22737623006105423,
+      "p90": 0.3679992973804474,
+      "max": 0.6243327260017395,
+      "n_above_1pct": 20,
+      "n_above_10pct": 16
+     },
+     "best_epoch": 188,
+     "best_val_mse": 0.0004911090363748372,
+     "train_time_s": 26.855661625042558,
+     "param_count": 137108
+    }
+   ],
+   "aggregate": {
+    "in_dist": {
+     "seed_means": [
+      0.028767374926246703,
+      0.030892306193709373,
+      0.028718404145911335
+     ],
+     "mean_over_seeds": 0.029459361755289137,
+     "std_over_seeds": 0.0010134419427644515,
+     "median_over_seeds": 0.028767374926246703,
+     "worst_case_max_over_seeds": 0.07972954958677292
+    },
+    "out_of_family": {
+     "seed_means": [
+      0.24089555069804192,
+      0.23314399905502797,
+      0.22834651451557875
+     ],
+     "mean_over_seeds": 0.23412868808954954,
+     "std_over_seeds": 0.005170221571539768,
+     "median_over_seeds": 0.23314399905502797,
+     "worst_case_max_over_seeds": 0.6364948749542236
+    }
+   },
+   "n_seeds": 3,
+   "train_time_s_median": 26.855661625042558
+  },
+  "nu_aware": {
+   "per_seed": [
+    {
+     "seed": 0,
+     "in_dist": {
+      "n": 40,
+      "n_nonfinite": 0,
+      "mean": 0.00840798313729465,
+      "std": 0.004422562464494192,
+      "median": 0.008006485877558589,
+      "p90": 0.011937822122126818,
+      "max": 0.025829341262578964,
+      "n_above_1pct": 8,
+      "n_above_10pct": 0
+     },
+     "out_of_family": {
+      "n": 20,
+      "n_nonfinite": 0,
+      "mean": 0.20946023594588042,
+      "std": 0.12321762778241598,
+      "median": 0.2172960489988327,
+      "p90": 0.3252511471509934,
+      "max": 0.5601822137832642,
+      "n_above_1pct": 20,
+      "n_above_10pct": 16
+     },
+     "best_epoch": 193,
+     "best_val_mse": 2.8497057428467087e-05,
+     "train_time_s": 31.684864833950996,
+     "param_count": 137140,
+     "in_dist_with_shuffled_nu": 0.031236032641027124,
+     "ood_with_shuffled_nu": 0.214824778214097
+    },
+    {
+     "seed": 1,
+     "in_dist": {
+      "n": 40,
+      "n_nonfinite": 0,
+      "mean": 0.009124539676122367,
+      "std": 0.005018294631568936,
+      "median": 0.00820387713611126,
+      "p90": 0.012934582401067022,
+      "max": 0.029961850494146347,
+      "n_above_1pct": 13,
+      "n_above_10pct": 0
+     },
+     "out_of_family": {
+      "n": 20,
+      "n_nonfinite": 0,
+      "mean": 0.22265266198664904,
+      "std": 0.13826923697031843,
+      "median": 0.22821449488401413,
+      "p90": 0.3560686379671097,
+      "max": 0.6217645406723022,
+      "n_above_1pct": 20,
+      "n_above_10pct": 16
+     },
+     "best_epoch": 197,
+     "best_val_mse": 3.362982897670008e-05,
+     "train_time_s": 29.21347891690675,
+     "param_count": 137140,
+     "in_dist_with_shuffled_nu": 0.032160725991707294,
+     "ood_with_shuffled_nu": 0.22759833745658398
+    },
+    {
+     "seed": 2,
+     "in_dist": {
+      "n": 40,
+      "n_nonfinite": 0,
+      "mean": 0.008944901276845486,
+      "std": 0.0053612652339898636,
+      "median": 0.007681039394810796,
+      "p90": 0.012845507543534041,
+      "max": 0.031203722581267357,
+      "n_above_1pct": 12,
+      "n_above_10pct": 0
+     },
+     "out_of_family": {
+      "n": 20,
+      "n_nonfinite": 0,
+      "mean": 0.23320533353835343,
+      "std": 0.1413245514985221,
+      "median": 0.24052949994802475,
+      "p90": 0.3746591627597809,
+      "max": 0.634462833404541,
+      "n_above_1pct": 20,
+      "n_above_10pct": 16
+     },
+     "best_epoch": 194,
+     "best_val_mse": 2.8978054615436122e-05,
+     "train_time_s": 24.538569667027332,
+     "param_count": 137140,
+     "in_dist_with_shuffled_nu": 0.03158249879488721,
+     "ood_with_shuffled_nu": 0.23834417201578617
+    }
+   ],
+   "aggregate": {
+    "in_dist": {
+     "seed_means": [
+      0.00840798313729465,
+      0.009124539676122367,
+      0.008944901276845486
+     ],
+     "mean_over_seeds": 0.008825808030087501,
+     "std_over_seeds": 0.00030441278926452044,
+     "median_over_seeds": 0.008944901276845486,
+     "worst_case_max_over_seeds": 0.031203722581267357
+    },
+    "out_of_family": {
+     "seed_means": [
+      0.20946023594588042,
+      0.22265266198664904,
+      0.23320533353835343
+     ],
+     "mean_over_seeds": 0.22177274382362766,
+     "std_over_seeds": 0.009713842593578442,
+     "median_over_seeds": 0.22265266198664904,
+     "worst_case_max_over_seeds": 0.634462833404541
+    }
+   },
+   "n_seeds": 3,
+   "train_time_s_median": 29.21347891690675
+  }
+ },
+ "nu_blind_floor": {
+  "stored_targets_current_solver_native_times": {
+   "in_dist": {
+    "n": 40,
+    "n_nonfinite": 0,
+    "mean": 0.02473015784053132,
+    "std": 0.015307221821406326,
+    "median": 0.023701278492808342,
+    "p90": 0.04056931920349598,
+    "max": 0.06823118031024933,
+    "n_above_1pct": 32,
+    "n_above_10pct": 0
+   },
+   "out_of_family": {
+    "n": 20,
+    "n_nonfinite": 0,
+    "mean": 0.02493565927725285,
+    "std": 0.016351564252738184,
+    "median": 0.02449753787368536,
+    "p90": 0.041703362390399,
+    "max": 0.062085725367069244,
+    "n_above_1pct": 16,
+    "n_above_10pct": 0
+   }
+  },
+  "aligned_targets_aligned_times": {
+   "in_dist": {
+    "n": 40,
+    "n_nonfinite": 0,
+    "mean": 0.024455973305157384,
+    "std": 0.01531153245394107,
+    "median": 0.02402456197887659,
+    "p90": 0.04014074169099331,
+    "max": 0.0675203800201416,
+    "n_above_1pct": 32,
+    "n_above_10pct": 0
+   },
+   "out_of_family": {
+    "n": 20,
+    "n_nonfinite": 0,
+    "mean": 0.02469408292672597,
+    "std": 0.016743414245028933,
+    "median": 0.024061971344053745,
+    "p90": 0.04156206548213961,
+    "max": 0.06221718341112137,
+    "n_above_1pct": 16,
+    "n_above_10pct": 0
+   }
+  }
+ },
+ "floor_definition": "mean over nu (24 Gauss-Legendre nodes on [0.01, 0.1]) of the FOM trajectory for the same initial condition; the L2-optimal predictor without nu. The floor for OOD is for a nu-blind model that had learned the two-mode initial-condition map perfectly.",
+ "inference_ms_batch1": {
+  "cpu": {
+   "blind": {
+    "n": 300,
+    "mean": 0.5934230366666666,
+    "median": 0.585125,
+    "std": 0.0376238779054205,
+    "min": 0.559917,
+    "max": 0.946125,
+    "p25": 0.578771,
+    "p75": 0.5949997499999999,
+    "cv": 0.06340144480530896
+   },
+   "nu_aware": {
+    "n": 300,
+    "mean": 0.6060040133333334,
+    "median": 0.5991040000000001,
+    "std": 0.032511279075522224,
+    "min": 0.5765830000000001,
+    "max": 0.9000000000000001,
+    "p25": 0.591083,
+    "p75": 0.6093547500000001,
+    "cv": 0.053648620075457065
+   }
+  },
+  "mps": {
+   "blind": {
+    "n": 300,
+    "mean": 1.93174346,
+    "median": 1.909667,
+    "std": 0.14840706264171435,
+    "min": 1.597625,
+    "max": 2.99475,
+    "p25": 1.8463435000000001,
+    "p75": 1.9803125000000001,
+    "cv": 0.07682545105741646
+   },
+   "nu_aware": {
+    "n": 300,
+    "mean": 1.9645061133333335,
+    "median": 1.942792,
+    "std": 0.15789353048807023,
+    "min": 1.619917,
+    "max": 3.0841250000000002,
+    "p25": 1.87190625,
+    "p75": 2.01951025,
+    "cv": 0.08037314285581924
+   }
+  }
+ },
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.12.2",
+  "numpy": "2.0.0",
+  "scipy": "1.13.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "5f61d788a3398b399484678f56ce683c09c9d0a5",
+  "git_dirty_paths": 17,
+  "loadavg_start": [
+   10.3779296875,
+   8.29150390625,
+   6.4091796875
+  ],
+  "top_cpu_processes_start": [
+   "100.4 python3",
+   "100.2 python3",
+   " 99.9 python3",
+   " 99.8 python3",
+   " 99.7 python3"
+  ],
+  "power": "Now drawing from 'AC Power'",
+  "torch": "2.11.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "loadavg_end": [
+   9.77490234375,
+   8.31591796875,
+   6.4716796875
+  ]
+ }
+}

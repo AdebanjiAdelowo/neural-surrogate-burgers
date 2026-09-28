@@ -16,9 +16,11 @@ an arbitrary array u0, not a computed A*sin(...) expression.
 
 import numpy as np
 
+from src.snapshot_times import align_step_count
+
 
 def solve_burgers_general_ic(u0: np.ndarray, nu: float, L: float = 2 * np.pi, T: float = 1.0,
-                              n_save: int = 20, dt: float = None):
+                              n_save: int = 20, dt: float = None, align_snapshots: bool = False):
     """Solve Burgers' equation for an arbitrary periodic initial condition u0, returning n_save
     snapshots. Numerical method identical to src.solver.solve_burgers (see module docstring).
 
@@ -39,6 +41,8 @@ def solve_burgers_general_ic(u0: np.ndarray, nu: float, L: float = 2 * np.pi, T:
         dt = 0.25 * (L / Nx) / (np.abs(u0).max() + 1e-8)
     n_steps = max(1, int(np.ceil(T / dt)))
     n_steps = max(n_steps, 4 * n_save)
+    if align_snapshots:  # see src/snapshot_times.py
+        n_steps = align_step_count(n_steps, n_save)
     dt = T / n_steps
 
     Lop = -nu * k**2

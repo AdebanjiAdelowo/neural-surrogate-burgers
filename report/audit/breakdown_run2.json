@@ -1,0 +1,302 @@
+{
+ "config": {
+  "Nx": 128,
+  "T": 1.0,
+  "n_save": 20,
+  "A_range": [
+   0.5,
+   2.0
+  ],
+  "nu_range": [
+   0.01,
+   0.1
+  ],
+  "split_sizes": {
+   "train": 200,
+   "val": 40,
+   "test": 40
+  },
+  "split_seed_offsets": {
+   "train": 0,
+   "val": 100000,
+   "test": 200000
+  },
+  "r": 8,
+  "m": 16,
+  "stencil_order": 2
+ },
+ "cases": [
+  {
+   "i": 0,
+   "A": 1.9218051433563232,
+   "nu": 0.03825710341334343,
+   "n_steps": {
+    "fom": 157,
+    "rom": 157,
+    "deim": 157
+   },
+   "rhs_evals": {
+    "fom": 628,
+    "rom": 628,
+    "deim": 628
+   },
+   "per_call_component_seconds": {
+    "rom.reconstruct_Phi@a (full grid)": 5.936874658800662e-07,
+    "rom.nonlinear_rhs_fullgrid (5 FFTs)": 3.120222897268832e-05,
+    "rom.project_Phi.T@f (full grid)": 1.3993540196679533e-06,
+    "deim.reconstruct_support_Phi_s@a": 5.860414821654558e-07,
+    "deim.gather_and_FD_at_points": 4.974062496330589e-06,
+    "deim.project_M@F": 8.795420289970934e-07,
+    "fom.nonlinear (1 ifft + 1 fft)": 1.1973978951573371e-05,
+    "n_support_rows": 36,
+    "Nx": 128,
+    "r": 8
+   },
+   "total_solver_only_seconds": {
+    "fom": 0.008949916,
+    "rom": 0.0216345,
+    "deim": 0.004700583
+   },
+   "rom_breakdown": {
+    "rom.reconstruct_Phi@a (full grid)": {
+     "seconds": 0.00037283572857268153,
+     "fraction": 0.017233387809872266
+    },
+    "rom.nonlinear_rhs_fullgrid (5 FFTs)": {
+     "seconds": 0.019594999794848265,
+     "fraction": 0.9057292655179581
+    },
+    "rom.project_Phi.T@f (full grid)": {
+     "seconds": 0.0008787943243514747,
+     "fraction": 0.040620043188031835
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.0007878701522275808,
+     "fraction": 0.03641730348413787
+    }
+   },
+   "deim_breakdown": {
+    "deim.reconstruct_support_Phi_s@a": {
+     "seconds": 0.00036803405079990627,
+     "fraction": 0.07829540522950158
+    },
+    "deim.gather_and_FD_at_points": {
+     "seconds": 0.00312371124769561,
+     "fraction": 0.6645369835391929
+    },
+    "deim.project_M@F": {
+     "seconds": 0.0005523523942101747,
+     "fraction": 0.11750721010780464
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.000656485307294309,
+     "fraction": 0.13966040112350084
+    }
+   },
+   "fom_breakdown": {
+    "fom.nonlinear (1 ifft + 1 fft)": {
+     "seconds": 0.0075196587815880775,
+     "fraction": 0.8401932243373097
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.001430257218411923,
+     "fraction": 0.15980677566269033
+    }
+   }
+  },
+  {
+   "i": 5,
+   "A": 1.888573408126831,
+   "nu": 0.01578621193766594,
+   "n_steps": {
+    "fom": 154,
+    "rom": 154,
+    "deim": 154
+   },
+   "rhs_evals": {
+    "fom": 616,
+    "rom": 616,
+    "deim": 616
+   },
+   "per_call_component_seconds": {
+    "rom.reconstruct_Phi@a (full grid)": 6.232919986359775e-07,
+    "rom.nonlinear_rhs_fullgrid (5 FFTs)": 3.05603125016205e-05,
+    "rom.project_Phi.T@f (full grid)": 1.3442920171655714e-06,
+    "deim.reconstruct_support_Phi_s@a": 5.692704580724239e-07,
+    "deim.gather_and_FD_at_points": 4.809853970073163e-06,
+    "deim.project_M@F": 1.0401249746792018e-06,
+    "fom.nonlinear (1 ifft + 1 fft)": 1.1606166488490998e-05,
+    "n_support_rows": 36,
+    "Nx": 128,
+    "r": 8
+   },
+   "total_solver_only_seconds": {
+    "fom": 0.00782525,
+    "rom": 0.018917166000000003,
+    "deim": 0.004082583
+   },
+   "rom_breakdown": {
+    "rom.reconstruct_Phi@a (full grid)": {
+     "seconds": 0.00038394787115976215,
+     "fraction": 0.020296268011802725
+    },
+    "rom.nonlinear_rhs_fullgrid (5 FFTs)": {
+     "seconds": 0.018825152500998227,
+     "fraction": 0.9951359786660552
+    },
+    "rom.project_Phi.T@f (full grid)": {
+     "seconds": 0.0008280838825739919,
+     "fraction": 0.043774203946510375
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": -0.001120018254731979,
+     "fraction": -0.0592064506243683
+    }
+   },
+   "deim_breakdown": {
+    "deim.reconstruct_support_Phi_s@a": {
+     "seconds": 0.0003506706021726131,
+     "fraction": 0.08589429833333778
+    },
+    "deim.gather_and_FD_at_points": {
+     "seconds": 0.0029628700455650685,
+     "fraction": 0.7257341848445136
+    },
+    "deim.project_M@F": {
+     "seconds": 0.0006407169844023883,
+     "fraction": 0.15693912025851975
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.00012832536785993033,
+     "fraction": 0.03143239656362904
+    }
+   },
+   "fom_breakdown": {
+    "fom.nonlinear (1 ifft + 1 fft)": {
+     "seconds": 0.007149398556910455,
+     "fraction": 0.9136319679129042
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.0006758514430895458,
+     "fraction": 0.08636803208709572
+    }
+   }
+  },
+  {
+   "i": 12,
+   "A": 1.3707576990127563,
+   "nu": 0.025130685418844223,
+   "n_steps": {
+    "fom": 112,
+    "rom": 112,
+    "deim": 112
+   },
+   "rhs_evals": {
+    "fom": 448,
+    "rom": 448,
+    "deim": 448
+   },
+   "per_call_component_seconds": {
+    "rom.reconstruct_Phi@a (full grid)": 5.692915292456746e-07,
+    "rom.nonlinear_rhs_fullgrid (5 FFTs)": 2.6931417000014336e-05,
+    "rom.project_Phi.T@f (full grid)": 1.2266039848327637e-06,
+    "deim.reconstruct_support_Phi_s@a": 5.121249705553055e-07,
+    "deim.gather_and_FD_at_points": 4.592395969666541e-06,
+    "deim.project_M@F": 7.755204569548369e-07,
+    "fom.nonlinear (1 ifft + 1 fft)": 1.032787497388199e-05,
+    "n_support_rows": 36,
+    "Nx": 128,
+    "r": 8
+   },
+   "total_solver_only_seconds": {
+    "fom": 0.005634083000000001,
+    "rom": 0.013645083,
+    "deim": 0.0030055840000000004
+   },
+   "rom_breakdown": {
+    "rom.reconstruct_Phi@a (full grid)": {
+     "seconds": 0.00025504260510206224,
+     "fraction": 0.018691172864398278
+    },
+    "rom.nonlinear_rhs_fullgrid (5 FFTs)": {
+     "seconds": 0.012065274816006423,
+     "fraction": 0.8842214309730781
+    },
+    "rom.project_Phi.T@f (full grid)": {
+     "seconds": 0.0005495185852050781,
+     "fraction": 0.040272278681271347
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.0007752469936864372,
+     "fraction": 0.056815117481252196
+    }
+   },
+   "deim_breakdown": {
+    "deim.reconstruct_support_Phi_s@a": {
+     "seconds": 0.00022943198680877686,
+     "fraction": 0.07633524360283286
+    },
+    "deim.gather_and_FD_at_points": {
+     "seconds": 0.0020573933944106103,
+     "fraction": 0.6845236714098192
+    },
+    "deim.project_M@F": {
+     "seconds": 0.0003474331647157669,
+     "fraction": 0.11559589241750251
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.0003713254540648461,
+     "fraction": 0.12354519256984535
+    }
+   },
+   "fom_breakdown": {
+    "fom.nonlinear (1 ifft + 1 fft)": {
+     "seconds": 0.0046268879882991314,
+     "fraction": 0.8212317760137952
+    },
+    "residual (RK4 vector ops, loop, snapshot saves)": {
+     "seconds": 0.0010071950117008692,
+     "fraction": 0.17876822398620487
+    }
+   }
+  }
+ ],
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.12.2",
+  "numpy": "2.0.0",
+  "scipy": "1.13.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "5f61d788a3398b399484678f56ce683c09c9d0a5",
+  "git_dirty_paths": 7,
+  "loadavg_start": [
+   8.76318359375,
+   6.8935546875,
+   4.73779296875
+  ],
+  "top_cpu_processes_start": [
+   "110.2 python3",
+   "109.8 python3",
+   "105.6 python3",
+   " 62.3 Code Helper (Renderer)",
+   " 25.3 python"
+  ],
+  "power": "Now drawing from 'Battery Power'",
+  "torch": "2.11.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "loadavg_end": [
+   8.62158203125,
+   6.89501953125,
+   4.7509765625
+  ]
+ }
+}

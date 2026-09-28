@@ -24,6 +24,12 @@ from src.deim import deim_rom_predict
 from src.general_ic_solver import solve_burgers_general_ic
 from src.solver import solve_burgers
 
+# Historical protocol: this script reproduces published numbers, so it pins the historical time-step
+# rule (the predictors' default is now the reduced-operator policy; see src/timestep.py).
+from functools import partial  # noqa: E402
+
+deim_rom_predict = partial(deim_rom_predict, timestep_policy="historical")
+
 N_TIMING_REPEATS = 20
 
 

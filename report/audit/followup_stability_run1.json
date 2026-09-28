@@ -1,0 +1,548 @@
+{
+ "rk4_real_limit": 2.785293,
+ "rk4_imag_limit": 2.828427,
+ "historical_rule": "dt = min(0.25 dx/(max|u0|+1e-8), 0.4 dx^2/(2 nu+1e-12)); n_steps = max(80, ceil(T/dt))  (src/pod_rom.py, src/deim.py; added in 8fdbca0)",
+ "historical_diffusion_constant_as_fraction_of_rk4_limit": {
+  "vs_fullgrid_spectral_laplacian": 0.7086941590051287,
+  "vs_fullgrid_fd3_laplacian": 0.2872229241232431
+ },
+ "fullgrid_lambda_max": {
+  "spectral_(pi/dx)^2": 4096.0,
+  "fd3_4/dx^2": 1660.046272796062
+ },
+ "reduced_diffusion": {
+  "rom": {
+   "rho": 1731.9901841345654,
+   "eig_min_real": -1731.9901841345654,
+   "eig_max_real": -1.0000068624305603,
+   "max_abs_imag": 0.0,
+   "eigenvalues": [
+    -1731.9901841345654,
+    -1228.9312352964441,
+    -429.69632664751697,
+    -122.2127377430759,
+    -33.94600714376845,
+    -10.798880094331237,
+    -4.03479712328429,
+    -1.0000068624305603
+   ],
+   "implied_dt_limit_at_safety_0.5": {
+    "nu=0.01": 0.08040729749839041,
+    "nu=0.1": 0.008040729749839041
+   },
+   "historical_dt_diffusive": {
+    "nu=0.01": 0.04819142773969413,
+    "nu=0.1": 0.004819142773969413
+   }
+  },
+  "deim": {
+   "rho": 1205.939208984375,
+   "eig_min_real": -1205.939208984375,
+   "eig_max_real": -0.9998816847801208,
+   "max_abs_imag": 0.0,
+   "eigenvalues": [
+    -1205.939208984375,
+    -925.6564331054688,
+    -377.9275207519531,
+    -115.9875717163086,
+    -33.23054504394531,
+    -10.661375045776367,
+    -4.02078104019165,
+    -0.9998816847801208
+   ],
+   "implied_dt_limit_at_safety_0.5": {
+    "nu=0.01": 0.11548231367092435,
+    "nu=0.1": 0.011548231367092435
+   },
+   "historical_dt_diffusive": {
+    "nu=0.01": 0.04819142773969413,
+    "nu=0.1": 0.004819142773969413
+   }
+  },
+  "ratio_rho_fullgrid_over_reduced": {
+   "rom": 2.364909476693527,
+   "deim": 1.376558835162288
+  }
+ },
+ "cases": [
+  {
+   "i": 34,
+   "A": 0.5363227128982544,
+   "nu": 0.07866185158491135,
+   "dt_historical": 0.006126403938936994,
+   "dt_fom": 0.022881459444761276,
+   "dt_revised": {
+    "rom": 0.010221892299546871,
+    "deim": 0.014680853723137606
+   },
+   "states": [
+    {
+     "snapshot": 0,
+     "rom": {
+      "max_re_eig": -0.3407743436710329,
+      "spectral_radius": 135.74083967597673,
+      "dt_star_frozen_rk4": 0.020490470244353628
+     },
+     "deim": {
+      "max_re_eig": -0.3433178417403443,
+      "spectral_radius": 94.60741638198712,
+      "dt_star_frozen_rk4": 0.029438215842807734
+     }
+    },
+    {
+     "snapshot": 5,
+     "rom": {
+      "max_re_eig": -0.3618860475957476,
+      "spectral_radius": 135.74156592687518,
+      "dt_star_frozen_rk4": 0.020490470244353628
+     },
+     "deim": {
+      "max_re_eig": -0.3688843548915447,
+      "spectral_radius": 94.6248760858162,
+      "dt_star_frozen_rk4": 0.029347960755258095
+     }
+    },
+    {
+     "snapshot": 10,
+     "rom": {
+      "max_re_eig": -0.3830364736645481,
+      "spectral_radius": 135.73797241130666,
+      "dt_star_frozen_rk4": 0.020490470244353628
+     },
+     "deim": {
+      "max_re_eig": -0.3926545599680656,
+      "spectral_radius": 94.61519293032612,
+      "dt_star_frozen_rk4": 0.029347960755258095
+     }
+    },
+    {
+     "snapshot": 15,
+     "rom": {
+      "max_re_eig": -0.40337812696110203,
+      "spectral_radius": 135.73162581435443,
+      "dt_star_frozen_rk4": 0.020490470244353628
+     },
+     "deim": {
+      "max_re_eig": -0.4153182616116013,
+      "spectral_radius": 94.58467536792989,
+      "dt_star_frozen_rk4": 0.029438215842807734
+     }
+    },
+    {
+     "snapshot": 19,
+     "rom": {
+      "max_re_eig": -0.417653384711106,
+      "spectral_radius": 135.72597245168413,
+      "dt_star_frozen_rk4": 0.020490470244353628
+     },
+     "deim": {
+      "max_re_eig": -0.43130516105914346,
+      "spectral_radius": 94.55108771062983,
+      "dt_star_frozen_rk4": 0.029438215842807734
+     }
+    }
+   ],
+   "min_dt_star_rom": 0.020490470244353628,
+   "dt_star_over_dt_historical_rom": 3.3446162624250624,
+   "dt_star_over_dt_fom_rom": 0.8955053891479345,
+   "min_dt_star_deim": 0.029347960755258095,
+   "dt_star_over_dt_historical_deim": 4.7904057662169635,
+   "dt_star_over_dt_fom_deim": 1.2826087787847522
+  },
+  {
+   "i": 39,
+   "A": 1.1018998622894287,
+   "nu": 0.07643801718950272,
+   "dt_historical": 0.006304641265079422,
+   "dt_fom": 0.01113698910921812,
+   "dt_revised": {
+    "rom": 0.01051928090953055,
+    "deim": 0.01113698910921812
+   },
+   "states": [
+    {
+     "snapshot": 0,
+     "rom": {
+      "max_re_eig": -0.8513321369960254,
+      "spectral_radius": 129.96312460123318,
+      "dt_star_frozen_rk4": 0.021390537794824083
+     },
+     "deim": {
+      "max_re_eig": -0.8103189534729812,
+      "spectral_radius": 91.6466966655411,
+      "dt_star_frozen_rk4": 0.030356174535329974
+     }
+    },
+    {
+     "snapshot": 5,
+     "rom": {
+      "max_re_eig": -0.7973840403687409,
+      "spectral_radius": 129.88910145420468,
+      "dt_star_frozen_rk4": 0.021390537794824083
+     },
+     "deim": {
+      "max_re_eig": -0.7750249306291243,
+      "spectral_radius": 91.66548696798452,
+      "dt_star_frozen_rk4": 0.030356174535329974
+     }
+    },
+    {
+     "snapshot": 10,
+     "rom": {
+      "max_re_eig": -0.8068801364298057,
+      "spectral_radius": 129.6625657722619,
+      "dt_star_frozen_rk4": 0.021456321066019888
+     },
+     "deim": {
+      "max_re_eig": -0.800447561504164,
+      "spectral_radius": 91.4478296324571,
+      "dt_star_frozen_rk4": 0.030449530227509347
+     }
+    },
+    {
+     "snapshot": 15,
+     "rom": {
+      "max_re_eig": -0.9093645166883335,
+      "spectral_radius": 129.30366200241008,
+      "dt_star_frozen_rk4": 0.021522306643432104
+     },
+     "deim": {
+      "max_re_eig": -0.9184480411870313,
+      "spectral_radius": 91.14551040097902,
+      "dt_star_frozen_rk4": 0.030543173020596316
+     }
+    },
+    {
+     "snapshot": 19,
+     "rom": {
+      "max_re_eig": -1.0276840374559713,
+      "spectral_radius": 129.04629800133864,
+      "dt_star_frozen_rk4": 0.021522306643432104
+     },
+     "deim": {
+      "max_re_eig": -1.0616119834553417,
+      "spectral_radius": 90.96638879139067,
+      "dt_star_frozen_rk4": 0.030543173020596316
+     }
+    }
+   ],
+   "min_dt_star_rom": 0.021390537794824083,
+   "dt_star_over_dt_historical_rom": 3.392823936439248,
+   "dt_star_over_dt_fom_rom": 1.9206751111141043,
+   "min_dt_star_deim": 0.030356174535329974,
+   "dt_star_over_dt_historical_deim": 4.814893228496414,
+   "dt_star_over_dt_fom_deim": 2.7257074814057307
+  },
+  {
+   "i": 26,
+   "A": 1.9742878675460815,
+   "nu": 0.08471298217773438,
+   "dt_historical": 0.005688788955428385,
+   "dt_fom": 0.006215834524482489,
+   "dt_revised": {
+    "rom": 0.006215834524482489,
+    "deim": 0.006215834524482489
+   },
+   "states": [
+    {
+     "snapshot": 0,
+     "rom": {
+      "max_re_eig": -0.9763589236793562,
+      "spectral_radius": 138.5011585052875,
+      "dt_star_frozen_rk4": 0.020054740010913823
+     },
+     "deim": {
+      "max_re_eig": -0.9746737167148932,
+      "spectral_radius": 101.19038085628995,
+      "dt_star_frozen_rk4": 0.02751523727185665
+     }
+    },
+    {
+     "snapshot": 5,
+     "rom": {
+      "max_re_eig": -1.318552818046886,
+      "spectral_radius": 137.38894816311654,
+      "dt_star_frozen_rk4": 0.020240335310750583
+     },
+     "deim": {
+      "max_re_eig": -1.4117440775205023,
+      "spectral_radius": 101.00505129858738,
+      "dt_star_frozen_rk4": 0.02751523727185665
+     }
+    },
+    {
+     "snapshot": 10,
+     "rom": {
+      "max_re_eig": -1.4803766599899195,
+      "spectral_radius": 133.38351898401083,
+      "dt_star_frozen_rk4": 0.02087148061647426
+     },
+     "deim": {
+      "max_re_eig": -1.3100088820836089,
+      "spectral_radius": 100.2211478125258,
+      "dt_star_frozen_rk4": 0.02776987526311312
+     }
+    },
+    {
+     "snapshot": 15,
+     "rom": {
+      "max_re_eig": -1.3951766828873575,
+      "spectral_radius": 133.12357555638783,
+      "dt_star_frozen_rk4": 0.02087148061647426
+     },
+     "deim": {
+      "max_re_eig": -0.798221611927827,
+      "spectral_radius": 100.13773310006586,
+      "dt_star_frozen_rk4": 0.02776987526311312
+     }
+    },
+    {
+     "snapshot": 19,
+     "rom": {
+      "max_re_eig": -1.2231480881658934,
+      "spectral_radius": 135.8366371342297,
+      "dt_star_frozen_rk4": 0.020490470244353628
+     },
+     "deim": {
+      "max_re_eig": -0.7478017739826471,
+      "spectral_radius": 100.20227343201796,
+      "dt_star_frozen_rk4": 0.02776987526311312
+     }
+    }
+   ],
+   "min_dt_star_rom": 0.020054740010913823,
+   "dt_star_over_dt_historical_rom": 3.525309194635721,
+   "dt_star_over_dt_fom_rom": 3.2263954151166083,
+   "min_dt_star_deim": 0.02751523727185665,
+   "dt_star_over_dt_historical_deim": 4.836747766077861,
+   "dt_star_over_dt_fom_deim": 4.426636063666364
+  },
+  {
+   "i": 0,
+   "A": 1.9218051433563232,
+   "nu": 0.03825710341334343,
+   "dt_historical": 0.006385583430528641,
+   "dt_fom": 0.006385583430528641,
+   "dt_revised": {
+    "rom": 0.006385583430528641,
+    "deim": 0.006385583430528641
+   },
+   "states": [
+    {
+     "snapshot": 0,
+     "rom": {
+      "max_re_eig": -0.9211672158433495,
+      "spectral_radius": 57.45680040439447,
+      "dt_star_frozen_rk4": 0.04916038429848332
+     },
+     "deim": {
+      "max_re_eig": -0.8637427655008152,
+      "spectral_radius": 45.21824780886198,
+      "dt_star_frozen_rk4": 0.06151270529424275
+     }
+    },
+    {
+     "snapshot": 5,
+     "rom": {
+      "max_re_eig": -1.0539369782840988,
+      "spectral_radius": 56.928351913346816,
+      "dt_star_frozen_rk4": 0.049615335908875784
+     },
+     "deim": {
+      "max_re_eig": -1.0296576710228882,
+      "spectral_radius": 45.37026073620821,
+      "dt_star_frozen_rk4": 0.06132411252654935
+     }
+    },
+    {
+     "snapshot": 10,
+     "rom": {
+      "max_re_eig": -1.7534184474201733,
+      "spectral_radius": 53.965571921542185,
+      "dt_star_frozen_rk4": 0.05275784502841389
+     },
+     "deim": {
+      "max_re_eig": 0.214016347082687,
+      "spectral_radius": 45.06877378568234,
+      "dt_star_frozen_rk4": 0.0
+     }
+    },
+    {
+     "snapshot": 15,
+     "rom": {
+      "max_re_eig": -1.4509359349917519,
+      "spectral_radius": 46.431706483673395,
+      "dt_star_frozen_rk4": 0.06132411252654935
+     },
+     "deim": {
+      "max_re_eig": 0.693500294390749,
+      "spectral_radius": 44.75189485046061,
+      "dt_star_frozen_rk4": 0.0
+     }
+    },
+    {
+     "snapshot": 19,
+     "rom": {
+      "max_re_eig": -1.2444648232602662,
+      "spectral_radius": 44.79247711503076,
+      "dt_star_frozen_rk4": 0.06362590006250428
+     },
+     "deim": {
+      "max_re_eig": 0.5520264178917864,
+      "spectral_radius": 44.74678033561867,
+      "dt_star_frozen_rk4": 0.0
+     }
+    }
+   ],
+   "min_dt_star_rom": 0.04916038429848332,
+   "dt_star_over_dt_historical_rom": 7.698651945169794,
+   "dt_star_over_dt_fom_rom": 7.698651945169794,
+   "min_dt_star_deim": 0.0,
+   "dt_star_over_dt_historical_deim": 0.0,
+   "dt_star_over_dt_fom_deim": 0.0
+  },
+  {
+   "i": 33,
+   "A": 1.5033825635910034,
+   "nu": 0.012243017554283142,
+   "dt_historical": 0.008162823505699635,
+   "dt_fom": 0.008162823505699635,
+   "dt_revised": {
+    "rom": 0.008162823505699635,
+    "deim": 0.008162823505699635
+   },
+   "states": [
+    {
+     "snapshot": 0,
+     "rom": {
+      "max_re_eig": -0.4144343054147579,
+      "spectral_radius": 21.727451764519067,
+      "dt_star_frozen_rk4": 0.12813996885610265
+     },
+     "deim": {
+      "max_re_eig": -0.3297333281666196,
+      "spectral_radius": 14.426652869468857,
+      "dt_star_frozen_rk4": 0.19277357786476865
+     }
+    },
+    {
+     "snapshot": 5,
+     "rom": {
+      "max_re_eig": -0.882265351587551,
+      "spectral_radius": 21.804613494342842,
+      "dt_star_frozen_rk4": 0.1265757157072248
+     },
+     "deim": {
+      "max_re_eig": -0.5039241758721282,
+      "spectral_radius": 14.859636679035562,
+      "dt_star_frozen_rk4": 0.18694418123629605
+     }
+    },
+    {
+     "snapshot": 10,
+     "rom": {
+      "max_re_eig": -0.7062041723600119,
+      "spectral_radius": 22.845389748291954,
+      "dt_star_frozen_rk4": 0.11614775909858102
+     },
+     "deim": {
+      "max_re_eig": 1.6747859084879462,
+      "spectral_radius": 15.035370335699618,
+      "dt_star_frozen_rk4": 0.0
+     }
+    },
+    {
+     "snapshot": 15,
+     "rom": {
+      "max_re_eig": -1.185083629862573,
+      "spectral_radius": 29.733120320008695,
+      "dt_star_frozen_rk4": 0.09140995579391611
+     },
+     "deim": {
+      "max_re_eig": 2.483430682287057,
+      "spectral_radius": 18.55803488834933,
+      "dt_star_frozen_rk4": 0.0
+     }
+    },
+    {
+     "snapshot": 19,
+     "rom": {
+      "max_re_eig": -1.3736941703365586,
+      "spectral_radius": 31.18473348555058,
+      "dt_star_frozen_rk4": 0.08837397453218196
+     },
+     "deim": {
+      "max_re_eig": 2.0431368843778284,
+      "spectral_radius": 21.884836299358113,
+      "dt_star_frozen_rk4": 0.0
+     }
+    }
+   ],
+   "min_dt_star_rom": 0.08837397453218196,
+   "dt_star_over_dt_historical_rom": 10.826397810815761,
+   "dt_star_over_dt_fom_rom": 10.826397810815761,
+   "min_dt_star_deim": 0.0,
+   "dt_star_over_dt_historical_deim": 0.0,
+   "dt_star_over_dt_fom_deim": 0.0
+  }
+ ],
+ "regression_case_nu0.15_A1": {
+  "rho_K_rom_10traj_basis": 1718.138438349959,
+  "rho_K_rom_stored_basis": 1731.9901841345654,
+  "historical__10traj_basis": {
+   "finite": true,
+   "max_abs": 1.0000838839009094
+  },
+  "historical__stored_basis": {
+   "finite": true,
+   "max_abs": 1.0002168877776512
+  },
+  "fom_advective_only__10traj_basis": {
+   "finite": false,
+   "max_abs": null
+  },
+  "fom_advective_only__stored_basis": {
+   "finite": false,
+   "max_abs": null
+  },
+  "dt_revised_10traj_basis": 0.005403703096775096
+ },
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.12.2",
+  "numpy": "2.0.0",
+  "scipy": "1.13.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "5f61d788a3398b399484678f56ce683c09c9d0a5",
+  "git_dirty_paths": 14,
+  "loadavg_start": [
+   3.05712890625,
+   4.8525390625,
+   4.484375
+  ],
+  "top_cpu_processes_start": [
+   "49.6 python",
+   " 37.5 launchd",
+   " 11.8 Code Helper (Plugin)",
+   " 11.6 coreaudiod",
+   "  7.9 WindowServer"
+  ],
+  "power": "Now drawing from 'AC Power'",
+  "torch": "2.11.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "loadavg_end": [
+   3.05712890625,
+   4.8525390625,
+   4.484375
+  ]
+ }
+}

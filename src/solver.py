@@ -20,10 +20,17 @@ expected steepening-location check.
 
 import numpy as np
 
+from src.snapshot_times import align_step_count
+
 
 def solve_burgers(A: float, nu: float, Nx: int = 128, L: float = 2 * np.pi,
-                   T: float = 1.0, n_save: int = 20, dt: float = None):
+                   T: float = 1.0, n_save: int = 20, dt: float = None,
+                   align_snapshots: bool = False):
     """Solve Burgers' equation for u0(x) = A*sin(2*pi*x/L), returning n_save snapshots.
+
+    align_snapshots: if True, n_steps is rounded up to a multiple of (n_save - 1) so the saved times
+        are exactly j/(n_save-1)*T (see src/snapshot_times.py). Default False keeps the historical
+        behaviour bit for bit.
 
     Returns:
         t_save: (n_save,) times, including t=0 and t=T.
@@ -47,6 +54,8 @@ def solve_burgers(A: float, nu: float, Nx: int = 128, L: float = 2 * np.pi,
     # np.linspace(0, n_steps, n_save) snapshot-selection could collide onto fewer than n_save
     # distinct step indices for some (A, nu) combinations, silently under-producing snapshots.
     n_steps = max(n_steps, 4 * n_save)
+    if align_snapshots:
+        n_steps = align_step_count(n_steps, n_save)
     dt = T / n_steps  # adjust so n_steps evenly divides [0, T]
 
     Lop = -nu * k**2  # linear operator eigenvalues (diffusion)

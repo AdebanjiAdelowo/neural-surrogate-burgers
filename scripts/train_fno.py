@@ -38,17 +38,18 @@ def get_device():
     return torch.device("cpu")
 
 
-def load_split(name):
-    d = np.load(f"data/{name}.npz")
+def load_split(name, data_prefix=""):
+    d = np.load(f"data/{data_prefix}{name}.npz")
     u = d["u"].astype(np.float32)             # (N, n_save, Nx)
     u0 = torch.from_numpy(u[:, 0, :].copy())   # (N, Nx) -- the actual IC field, not (A, nu)
     target = torch.from_numpy(u)               # (N, n_save, Nx)
-    return u0, target
+    nu = torch.from_numpy(d["nu"].astype(np.float32))  # (N,) -- only fed to the network if nu-aware
+    return u0, target, nu
 
 
 def overfit_check(device, n_examples=4, steps=500, modes=16, width=32, n_layers=4, seed=0):
     set_seed(seed)
-    u0, target = load_split("train")
+    u0, target, _ = load_split("train")
     u0, target = u0[:n_examples].to(device), target[:n_examples].to(device)
 
     n_save, Nx = target.shape[1], target.shape[2]
@@ -71,15 +72,16 @@ def overfit_check(device, n_examples=4, steps=500, modes=16, width=32, n_layers=
 
 
 def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_layers=4, seed=0,
-          checkpoint_path=CHECKPOINT_PATH, run_meta_path=RUN_META_PATH):
+          checkpoint_path=CHECKPOINT_PATH, run_meta_path=RUN_META_PATH, use_nu=False,
+          data_prefix=""):
     set_seed(seed)
-    u0_train, y_train = load_split("train")
-    u0_val, y_val = load_split("val")
-    u0_train, y_train = u0_train.to(device), y_train.to(device)
-    u0_val, y_val = u0_val.to(device), y_val.to(device)
+    u0_train, y_train, nu_train = load_split("train", data_prefix)
+    u0_val, y_val, nu_val = load_split("val", data_prefix)
+    u0_train, y_train, nu_train = u0_train.to(device), y_train.to(device), nu_train.to(device)
+    u0_val, y_val, nu_val = u0_val.to(device), y_val.to(device), nu_val.to(device)
 
     n_save, Nx = y_train.shape[1], y_train.shape[2]
-    model = FNO1d(Nx, n_save, modes=modes, width=width, n_layers=n_layers).to(device)
+    model = FNO1d(Nx, n_save, modes=modes, width=width, n_layers=n_layers, use_nu=use_nu).to(device)
     param_count = sum(p.numel() for p in model.parameters())
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
@@ -97,7 +99,7 @@ def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_laye
             idx = perm[i:i + batch_size]
             u0b, yb = u0_train[idx], y_train[idx]
             opt.zero_grad()
-            pred = model(u0b)
+            pred = model(u0b, nu_train[idx])
             loss = loss_fn(pred, yb)
             loss.backward()
             opt.step()
@@ -106,13 +108,13 @@ def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_laye
 
         model.eval()
         with torch.no_grad():
-            val_loss = loss_fn(model(u0_val), y_val).item()
+            val_loss = loss_fn(model(u0_val, nu_val), y_val).item()
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save({"model_state": model.state_dict(), "epoch": epoch, "val_loss": val_loss,
                         "n_save": n_save, "Nx": Nx, "modes": modes, "width": width,
-                        "n_layers": n_layers}, checkpoint_path)
+                        "n_layers": n_layers, "use_nu": use_nu}, checkpoint_path)
 
         if (epoch + 1) % 20 == 0 or epoch == 0:
             print(f"epoch {epoch + 1}/{epochs}  train_loss={epoch_loss:.6f}  val_loss={val_loss:.6f}")
@@ -126,7 +128,8 @@ def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_laye
         "model": "FNO1d", "epochs": epochs, "batch_size": batch_size, "lr": lr, "seed": seed,
         "modes": modes, "width": width, "n_layers": n_layers, "param_count": param_count,
         "device": str(device), "best_val_loss": best_val_loss, "total_train_time_s": total_time,
-        "torch_version": torch.__version__, "n_train_examples": n,
+        "torch_version": torch.__version__, "n_train_examples": n, "use_nu": use_nu,
+        "data_prefix": data_prefix,
     }
     with open(run_meta_path, "w") as f:
         json.dump(run_meta, f, indent=2)
@@ -141,6 +144,12 @@ if __name__ == "__main__":
     parser.add_argument("--width", type=int, default=32)
     parser.add_argument("--n-layers", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--nu-aware", action="store_true",
+                        help="add the normalised viscosity as a third input channel")
+    parser.add_argument("--data-prefix", default="",
+                        help="file prefix under data/, e.g. aligned_ for data/aligned_train.npz")
+    parser.add_argument("--out-prefix", default="",
+                        help="prefix for checkpoint/meta names (default: historical names)")
     args = parser.parse_args()
 
     device = get_device()
@@ -155,8 +164,10 @@ if __name__ == "__main__":
             print("OVERFIT CHECK FAILED -- do not proceed to full training.")
             sys.exit(1)
     else:
-        seed_suffix = "" if args.seed == 0 else f"_seed{args.seed}"
+        seed_suffix = "" if args.seed == 0 and not args.out_prefix else f"_seed{args.seed}"
+        name = f"{args.out_prefix}" if args.out_prefix else ""
         train(device, epochs=args.epochs, modes=args.modes, width=args.width,
               n_layers=args.n_layers, seed=args.seed,
-              checkpoint_path=f"experiments/fno_checkpoint{seed_suffix}.pt",
-              run_meta_path=f"experiments/fno_run_meta{seed_suffix}.json")
+              checkpoint_path=f"experiments/{name}fno_checkpoint{seed_suffix}.pt",
+              run_meta_path=f"experiments/{name}fno_run_meta{seed_suffix}.json",
+              use_nu=args.nu_aware, data_prefix=args.data_prefix)

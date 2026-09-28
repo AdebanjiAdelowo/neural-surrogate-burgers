@@ -39,6 +39,13 @@ from src.deim import (build_deim_basis, build_deim_projector, collect_nonlinear_
                        _stencil_support)
 from src.pod_rom import build_pod_basis, rom_predict
 
+# Historical protocol: this script reproduces published numbers, so it pins the historical time-step
+# rule (the predictors' default is now the reduced-operator policy; see src/timestep.py).
+from functools import partial  # noqa: E402
+
+deim_rom_predict = partial(deim_rom_predict, timestep_policy="historical")
+rom_predict = partial(rom_predict, timestep_policy="historical")
+
 ROM_MODES = 8
 CANDIDATE_M = [6, 8, 10, 12, 16, 24, 32]
 
