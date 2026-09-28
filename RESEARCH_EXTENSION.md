@@ -1,14 +1,19 @@
 # Research Extension: DEIM/Local-FD Hyper-Reduction and an FNO Baseline for Parametric Burgers
 
-**Status: implemented, tested, and put through a self-review scrutiny pass on the branch
-`research/rom-deim-fno-burgers`, baseline commit `6aaa282`. Not yet committed or merged, and not
-externally/third-party peer reviewed.** This is revision 2 of this document, written after a
-review pass that checked the original claims mathematically and experimentally rather than
-accepting them on inspection. Three
-substantive corrections came out of that review and are recorded throughout: (1) the method's name
-was imprecise, (2) the novelty claim was insufficiently hedged, (3) one causal explanation ("DEIM
-degrades at high rank because the SVD fits noise") was tested directly and found **not** supported
-by the evidence, and is retracted in favour of a different, evidence-backed mechanism.
+This document is revision 2 of the extension write-up. Three substantive corrections were made in
+it: (1) the method's name was imprecise, (2) the novelty claim was insufficiently hedged, (3) one
+causal explanation ("DEIM degrades at high rank because the SVD fits noise") was tested directly,
+found **not** supported by the evidence, and replaced by a different, evidence-backed mechanism.
+
+> **Superseded figures.** The runtime and accuracy numbers below are single-configuration
+> measurements kept for provenance. A later 40-case re-evaluation (`report/audit/`, summarised in
+> the README section "Hyper-Reduction and FNO Extension") found that: the "approximately 2.0x faster
+> than the full solver" figure was one test case, and the workload average at Nx = 128 depends on
+> the NumPy FFT implementation (1.6x to 1.9x faster with NumPy 2.0.0, 0.8x to 0.9x with NumPy 1.26.4);
+> 4.35% is the 40-case mean DEIM/local-FD error (median 0.3%, maximum 52%), not a steep-regime
+> figure; the DEIM/local-FD system is linearly unstable on steep trajectories; and the FNO here was
+> not given the viscosity (a viscosity-aware FNO reaches 0.90% in distribution and 22.6% on the
+> unseen family).
 
 **Novelty classification (unchanged from revision 1, reaffirmed after review): comparative/
 methodological study with one modest, disclosed technical contribution, not new scientific
@@ -318,6 +323,11 @@ consistent (non-anomalous) runs as the reported figure. Both figures improved fr
 unchanged code). These multipliers are specific to this hardware and benchmark configuration and
 should not be read as universal constants -- see the excluded anomalous run above for how much
 single-machine timing noise can matter.
+
+> **Correction.** These figures are for a single test case. Over all 40 test cases the DEIM-ROM
+> is 1.52x to 1.57x faster than the full solver under this protocol (three runs, NumPy 2.0.0), and
+> with NumPy 1.26.4, whose FFT is about three times faster at n = 128, it is slightly slower than the
+> full solver. See the README section "Hyper-Reduction and FNO Extension".
 
 **Component breakdown** (cProfile, post-fix): `deim_rhs` (state reconstruction + local-FD
 nonlinear evaluation + $M$-projection, combined) accounts for essentially all of DEIM-ROM's online
