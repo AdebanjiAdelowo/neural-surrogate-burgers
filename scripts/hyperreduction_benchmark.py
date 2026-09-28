@@ -24,6 +24,7 @@ import gc
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -92,7 +93,9 @@ def environment_info():
         "git_dirty_paths": (sh("git status --porcelain") or "").count("\n") + 1
         if sh("git status --porcelain") else 0,
         "loadavg_start": os.getloadavg(),
-        "top_cpu_processes_start": (sh("ps -Ao pcpu,comm -r | sed -n 2,6p") or "").split("\n"),
+        # executable names only (no paths), so saved results carry no local filesystem details
+        "top_cpu_processes_start": [re.sub(r"^(\s*[\d.]+ )/.*/", r"\1", line) for line in
+                                    (sh("ps -Ao pcpu,comm -r | sed -n 2,6p") or "").split("\n")],
         "power": sh("pmset -g batt | sed -n 1p"),
     }
     try:
