@@ -10,9 +10,11 @@ NOT do:
   3. A component-level breakdown of DEIM-ROM's online cost (via cProfile), to identify where time
      is actually spent, not just the total.
 
-Run: python scripts/verify_timing.py
-Output: report/research/timing_verification.json
+Run: python scripts/verify_timing.py [--device D] [--checkpoint-dir DIR] [--out PATH]
+Output: report/research/timing_verification.json (the historical Apple MPS result; a CUDA run must
+        write elsewhere via --out, see REMOTE_GPU.md)
 """
+import argparse
 import cProfile
 import io
 import json
@@ -28,6 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.train_surrogate import normalize_params
 from src.deim import deim_rom_predict
+from src.device import add_device_argument, device_info, select_device, synchronize
 from src.fno_net import FNO1d
 from src.pod_rom import rom_predict
 from src.solver import solve_burgers
@@ -42,10 +45,7 @@ rom_predict = partial(rom_predict, timestep_policy="historical")
 
 N_CALLS_PER_TRIAL = 20
 N_TRIALS = 7
-
-
-def get_device():
-    return torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+HISTORICAL_OUT = "report/research/timing_verification.json"
 
 
 def time_trials(fn, n_calls=N_CALLS_PER_TRIAL, n_trials=N_TRIALS, sync_fn=None):
@@ -61,10 +61,14 @@ def time_trials(fn, n_calls=N_CALLS_PER_TRIAL, n_trials=N_TRIALS, sync_fn=None):
     return trial_means
 
 
-def main():
-    device = get_device()
-    mps_sync = torch.mps.synchronize if device.type == "mps" else None
-    print(f"Device: {device}  (MPS sync {'enabled' if mps_sync else 'not applicable (CPU)'})")
+def main(device_name="auto", checkpoint_dir="experiments", out_path=HISTORICAL_OUT):
+    device = select_device(device_name)
+    if device.type == "cuda" and os.path.normpath(out_path) == HISTORICAL_OUT:
+        raise SystemExit(f"refusing to overwrite the historical {HISTORICAL_OUT} with a CUDA run; "
+                         "pass --out (see REMOTE_GPU.md)")
+    # MPS and CUDA both dispatch asynchronously; CPU needs no synchronization.
+    nn_sync = (lambda: synchronize(device)) if device.type in ("mps", "cuda") else None
+    print(f"Device: {device}  ({device.type.upper() + ' sync enabled' if nn_sync else 'sync not applicable (CPU)'})")
 
     d = np.load("experiments/deim_basis.npz")
     Phi, points, M, m, Nx = d["Phi"], d["points"], d["M"], int(d["m"]), int(d["Nx"])
@@ -77,23 +81,23 @@ def main():
     u0_0 = d_test["u"][0, 0]
     n_save = d_test["u"].shape[1]
 
-    ckpt = torch.load("experiments/surrogate_checkpoint.pt", map_location=device,
+    ckpt = torch.load(os.path.join(checkpoint_dir, "surrogate_checkpoint.pt"), map_location=device,
                        weights_only=True)
     mlp = BurgersSurrogateMLP(ckpt["n_save"], ckpt["Nx"]).to(device)
     mlp.load_state_dict(ckpt["model_state"])
     mlp.eval()
 
-    fno_ckpt = torch.load("experiments/fno_checkpoint.pt", map_location=device,
+    fno_ckpt = torch.load(os.path.join(checkpoint_dir, "fno_checkpoint.pt"), map_location=device,
                            weights_only=True)
     fno = FNO1d(fno_ckpt["Nx"], fno_ckpt["n_save"], modes=fno_ckpt["modes"],
                 width=fno_ckpt["width"], n_layers=fno_ckpt["n_layers"]).to(device)
     fno.load_state_dict(fno_ckpt["model_state"])
     fno.eval()
 
-    results = {"device": str(device), "n_calls_per_trial": N_CALLS_PER_TRIAL,
+    results = {"device": str(device), "device_info": device_info(device), "n_calls_per_trial": N_CALLS_PER_TRIAL,
                "n_trials": N_TRIALS}
 
-    # ---- (1) repeated-trial timing, all five methods, MPS-synchronized for NN methods ----
+    # ---- (1) repeated-trial timing, all five methods, device-synchronized for NN methods ----
     def solver_call():
         solve_burgers(A=A0, nu=nu0, Nx=Nx, T=1.0, n_save=n_save)
 
@@ -125,12 +129,12 @@ def main():
     # warm-up (JIT/graph warm-up), then synchronize before starting the real trials
     mlp_call()
     fno_call()
-    if mps_sync:
-        mps_sync()
+    if nn_sync:
+        nn_sync()
 
     for name, fn, sync in [("solver", solver_call, None), ("rom", rom_call, None),
-                            ("deim_rom", deim_call, None), ("mlp", mlp_call, mps_sync),
-                            ("fno", fno_call, mps_sync)]:
+                            ("deim_rom", deim_call, None), ("mlp", mlp_call, nn_sync),
+                            ("fno", fno_call, nn_sync)]:
         trials = time_trials(fn, sync_fn=sync)
         results.setdefault("timing_ms", {})[name] = {
             "trial_means": trials, "median": float(np.median(trials)),
@@ -167,11 +171,16 @@ def main():
     print(s.getvalue())
     results["deim_rom_profile_text"] = s.getvalue()
 
-    os.makedirs("report/research", exist_ok=True)
-    with open("report/research/timing_verification.json", "w") as f:
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
-    print("Saved report/research/timing_verification.json")
+    print(f"Saved {out_path}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    add_device_argument(parser)
+    parser.add_argument("--checkpoint-dir", default="experiments")
+    parser.add_argument("--out", default=HISTORICAL_OUT)
+    args = parser.parse_args()
+    main(args.device, args.checkpoint_dir, args.out)

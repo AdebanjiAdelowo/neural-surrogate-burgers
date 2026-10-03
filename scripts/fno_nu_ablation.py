@@ -9,8 +9,10 @@ Train them with:
   python scripts/train_fno.py --epochs 200 --seed S --out-prefix rerun_
 Optional aligned-data variants (prefix al_nu_ / al_rerun_, --data-prefix aligned_) use `--aligned`.
 
-Run: python scripts/fno_nu_ablation.py [--aligned] [--tag TAG]
-Output: report/audit/fno_ablation[_aligned]_<tag>.json
+Run: python scripts/fno_nu_ablation.py [--aligned] [--tag TAG] [--overwrite]
+Output: report/audit/fno_ablation[_aligned]_<tag>.json. An existing output (including the committed
+        historical run1 files, which the default tag points at) is never replaced unless --overwrite
+        is given; pass a new --tag for a new run.
 """
 import argparse
 import json
@@ -22,8 +24,9 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.hyperreduction_benchmark import (N_SAVE, NU_RANGE, NX, T_FINAL, environment_info,
+from scripts.hyperreduction_benchmark import (N_SAVE, NU_RANGE, NX, OUT_DIR, T_FINAL, environment_info,
                                                err_stats, finish_env, interleaved_timing, save, stats)
+from src.device import timing_devices
 from src.fno_net import FNO1d
 from src.general_ic_solver import solve_burgers_general_ic
 from src.metrics import relative_l2
@@ -54,7 +57,16 @@ def nu_mean_predictor(solve, nus_nodes, weights):
     return np.tensordot(weights, sols, axes=1).astype(np.float32)
 
 
-def stage(tag, aligned):
+def output_path(tag, aligned):
+    name = "fno_ablation" + ("_aligned" if aligned else "")
+    return os.path.join(OUT_DIR, f"{name}{'_' + tag if tag else ''}.json")  # same rule as save()
+
+
+def stage(tag, aligned, overwrite=False):
+    path = output_path(tag, aligned)
+    if os.path.exists(path) and not overwrite:
+        raise SystemExit(f"{path} already exists (the default tag points at the historical result); "
+                         "pass a new --tag, or --overwrite to replace it deliberately")
     env = environment_info()
     pre = "aligned_" if aligned else ""
     d_test, d_ood = np.load(f"data/{pre}test.npz"), np.load(f"data/{pre}ood_family_test.npz")
@@ -133,8 +145,7 @@ def stage(tag, aligned):
     # ---- inference timing (batch 1, output copied to host), blind vs nu-aware
     timing = {}
     ref_paths = {"blind": variants.get("historical", variants["blind_rerun"])[0], "nu_aware": variants["nu_aware"][0]}
-    devs = ["cpu"] + (["mps"] if torch.backends.mps.is_available() else [])
-    for dev in devs:
+    for dev in timing_devices():
         calls = {}
         for label, path in ref_paths.items():
             m, _ = load_model(path)
@@ -142,6 +153,8 @@ def stage(tag, aligned):
             u = torch.from_numpy(tU[0:1, 0].astype(np.float32)).to(dev)
             nu = torch.from_numpy(tnu[0:1].astype(np.float32)).to(dev)
             calls[label] = (lambda m=m, u=u, nu=nu: m(u, nu).detach().cpu().numpy())
+        if dev == "cuda":  # the host copy already blocks; the sync makes the CUDA bracket explicit
+            calls = {k: (lambda f=f: (f(), torch.cuda.synchronize())) for k, f in calls.items()}
         t = interleaved_timing(calls, reps=300, warmup=20)
         timing[dev] = {k: stats(np.array(v) * 1e3) for k, v in t.items()}
         print(dev, {k: f"{v['median']:.3f} ms" for k, v in timing[dev].items()})
@@ -154,5 +167,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--aligned", action="store_true")
     ap.add_argument("--tag", default="run1")
+    ap.add_argument("--overwrite", action="store_true", help="replace an existing output file")
     a = ap.parse_args()
-    stage(a.tag, a.aligned)
+    stage(a.tag, a.aligned, a.overwrite)

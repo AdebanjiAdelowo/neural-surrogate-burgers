@@ -8,10 +8,12 @@ No hyperparameter search was performed based on any test/validation/out-of-famil
 seeds 1 and 2 use the exact same modes/width/n_layers/epochs/lr/batch_size as seed 0 (the original,
 already-reported run); only the random seed differs.
 
-Run: python scripts/evaluate_fno_multiseed.py (requires experiments/fno_checkpoint[_seed{1,2}].pt,
-     produced by `python scripts/train_fno.py --epochs 200 --seed {1,2}`)
-Output: report/research/fno_multiseed_results.json
+Run: python scripts/evaluate_fno_multiseed.py [--device D] [--checkpoint-dir DIR] [--out PATH]
+     (requires <checkpoint-dir>/fno_checkpoint[_seed{1,2}].pt, produced by
+     `python scripts/train_fno.py --epochs 200 --seed {1,2}`)
+Output: report/research/fno_multiseed_results.json (historical; a CUDA run must pass --out)
 """
+import argparse
 import json
 import os
 import sys
@@ -21,23 +23,21 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.device import add_device_argument, device_info, select_device
 from src.fno_net import FNO1d
 from src.solver import solve_burgers
 
 SEEDS = [0, 1, 2]
+HISTORICAL_OUT = "report/research/fno_multiseed_results.json"
 
 
 def rel_l2(pred, gt):
     return float(np.linalg.norm(pred - gt) / (np.linalg.norm(gt) + 1e-12))
 
 
-def get_device():
-    return torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
-
-
-def load_fno(seed, device):
+def load_fno(seed, device, checkpoint_dir="experiments"):
     suffix = "" if seed == 0 else f"_seed{seed}"
-    ckpt = torch.load(f"experiments/fno_checkpoint{suffix}.pt", map_location=device,
+    ckpt = torch.load(os.path.join(checkpoint_dir, f"fno_checkpoint{suffix}.pt"), map_location=device,
                        weights_only=True)
     model = FNO1d(ckpt["Nx"], ckpt["n_save"], modes=ckpt["modes"], width=ckpt["width"],
                    n_layers=ckpt["n_layers"]).to(device)
@@ -52,8 +52,11 @@ def fno_predict(model, device, u0_np):
         return model(u0).cpu().numpy()[0]
 
 
-def main():
-    device = get_device()
+def main(device_name="auto", checkpoint_dir="experiments", out_path=HISTORICAL_OUT):
+    device = select_device(device_name)
+    if device.type == "cuda" and os.path.normpath(out_path) == HISTORICAL_OUT:
+        raise SystemExit(f"refusing to overwrite the historical {HISTORICAL_OUT} with a CUDA run; "
+                         "pass --out (see REMOTE_GPU.md)")
     print(f"Device: {device}")
 
     d_test = np.load("data/test.npz")
@@ -72,7 +75,7 @@ def main():
 
     per_seed = {}
     for seed in SEEDS:
-        model, ckpt = load_fno(seed, device)
+        model, ckpt = load_fno(seed, device, checkpoint_dir)
 
         id_errs = [rel_l2(fno_predict(model, device, u_test[i, 0]), u_test[i])
                    for i in range(len(A_test))]
@@ -112,6 +115,7 @@ def main():
             for label, vals in extrap_by_case.items()
         },
         "per_seed_detail": per_seed,
+        "device_info": device_info(device),
     }
 
     print("\n=== Summary across 3 seeds (mean +/- std) ===")
@@ -123,11 +127,16 @@ def main():
         print(f"Extrapolation [{label}]: {v['mean_across_seeds']*100:.2f}% "
               f"+/- {v['std_across_seeds']*100:.2f}%")
 
-    os.makedirs("report/research", exist_ok=True)
-    with open("report/research/fno_multiseed_results.json", "w") as f:
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(summary, f, indent=2)
-    print("\nSaved report/research/fno_multiseed_results.json")
+    print(f"\nSaved {out_path}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    add_device_argument(parser)
+    parser.add_argument("--checkpoint-dir", default="experiments")
+    parser.add_argument("--out", default=HISTORICAL_OUT)
+    args = parser.parse_args()
+    main(args.device, args.checkpoint_dir, args.out)

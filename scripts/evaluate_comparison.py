@@ -2,7 +2,11 @@
 held-out test split. Real metrics only: relative L2 error, wall-clock runtime, and behaviour
 across the parameter range (including outside the training range, to test generalisation
 honestly). Nothing here is invented or adjusted by hand.
+
+Run: python scripts/evaluate_comparison.py [--device D] [--checkpoint-dir DIR] [--out-dir DIR]
+Output: report/mvp_results.txt, report/mvp_comparison.png (historical; a CUDA run must pass --out-dir)
 """
+import argparse
 import os
 import sys
 import time
@@ -17,6 +21,7 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.train_surrogate import A_RANGE, NU_RANGE, normalize_params
+from src.device import add_device_argument, select_device, synchronize
 from src.pod_rom import build_pod_basis, rom_predict
 from src.solver import solve_burgers
 from src.surrogate_net import BurgersSurrogateMLP
@@ -28,14 +33,18 @@ from functools import partial  # noqa: E402
 rom_predict = partial(rom_predict, timestep_policy="historical")
 
 ROM_MODES = 8
+HISTORICAL_OUT_DIR = "report"
 
 
 def rel_l2(pred, gt):
     return float(np.linalg.norm(pred - gt) / np.linalg.norm(gt))
 
 
-def main():
-    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+def main(device_name="auto", checkpoint_dir="experiments", out_dir=HISTORICAL_OUT_DIR):
+    device = select_device(device_name)
+    if device.type == "cuda" and os.path.normpath(out_dir) == HISTORICAL_OUT_DIR:
+        raise SystemExit("refusing to overwrite the historical report/mvp_results.txt with a CUDA run; "
+                         "pass --out-dir (see REMOTE_GPU.md)")
 
     # Load data and build the POD basis from the training ensemble (same basis Stage 3 verified).
     d_train = np.load("data/train.npz")
@@ -49,7 +58,8 @@ def main():
     Phi = Phi_full[:, :ROM_MODES]
 
     # Load the trained surrogate.
-    ckpt = torch.load("experiments/surrogate_checkpoint.pt", map_location=device, weights_only=True)
+    ckpt = torch.load(os.path.join(checkpoint_dir, "surrogate_checkpoint.pt"), map_location=device,
+                      weights_only=True)
     model = BurgersSurrogateMLP(ckpt["n_save"], ckpt["Nx"]).to(device)
     model.load_state_dict(ckpt["model_state"])
     model.eval()
@@ -90,12 +100,19 @@ def main():
     rom_time = (time.time() - t0) / n_repeats
 
     params0 = torch.from_numpy(normalize_params(np.array([A0]), np.array([nu0]))).to(device)
+    # The historical CPU/MPS timing below has no host copy and no explicit sync; it is kept as it
+    # was. CUDA kernels return before they finish, so on CUDA the timer is bracketed by syncs.
+    cuda_sync = device.type == "cuda"
     with torch.no_grad():
         model(params0)  # warm-up (JIT/graph warm-up on first call)
+    if cuda_sync:
+        synchronize(device)
     t0 = time.time()
     with torch.no_grad():
         for _ in range(n_repeats):
             model(params0)
+    if cuda_sync:
+        synchronize(device)
     surrogate_time = (time.time() - t0) / n_repeats
 
     print("\nWall-clock runtime per evaluation (mean of 20 calls):")
@@ -121,10 +138,11 @@ def main():
               f"Surrogate err={rel_l2(u_surr_e, gt_e):.4f}")
 
     # --- Save results ---
-    os.makedirs("report", exist_ok=True)
-    with open("report/mvp_results.txt", "w") as f:
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "mvp_results.txt"), "w") as f:
         f.write("Neural Surrogate vs. POD-ROM — MVP Comparative Evaluation (real, measured)\n")
         f.write(f"POD-ROM modes: r={ROM_MODES}\n")
+        f.write(f"Neural-network device: {device}\n")
         f.write(f"Surrogate checkpoint: epoch {ckpt['epoch']}, val_loss {ckpt['val_loss']:.6f}\n\n")
         f.write(f"In-distribution test set (n={len(A_test)}):\n")
         f.write(f"  POD-ROM (r={ROM_MODES}) relative L2: mean={np.mean(rom_errors):.5f} std={np.std(rom_errors):.5f}\n")
@@ -166,9 +184,14 @@ def main():
         axes[i].set_title(f"A={A_test[i]:.2f}, nu={nu_test[i]:.3f}")
         axes[i].legend(fontsize=8)
     plt.tight_layout()
-    plt.savefig("report/mvp_comparison.png", dpi=120)
-    print("\nSaved report/mvp_results.txt and report/mvp_comparison.png")
+    plt.savefig(os.path.join(out_dir, "mvp_comparison.png"), dpi=120)
+    print(f"\nSaved {out_dir}/mvp_results.txt and {out_dir}/mvp_comparison.png (device={device})")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    add_device_argument(parser)
+    parser.add_argument("--checkpoint-dir", default="experiments")
+    parser.add_argument("--out-dir", default=HISTORICAL_OUT_DIR)
+    args = parser.parse_args()
+    main(args.device, args.checkpoint_dir, args.out_dir)

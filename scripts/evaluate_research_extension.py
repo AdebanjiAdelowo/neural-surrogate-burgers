@@ -22,10 +22,12 @@ training time horizon by construction), this script reports that explicitly as "
 rather than forcing an ad-hoc workaround -- this is itself one of the study's findings, not a gap
 to paper over.
 
-Run: python scripts/evaluate_research_extension.py
+Run: python scripts/evaluate_research_extension.py [--device D] [--checkpoint-dir DIR] [--out-dir DIR]
 Output: report/research/results.json, report/research/results_summary.txt,
-        report/research/comparison_figure.png
+        report/research/comparison_figure.png (the historical Apple MPS results; a CUDA run must
+        write to its own --out-dir, see REMOTE_GPU.md)
 """
+import argparse
 import json
 import os
 import sys
@@ -42,6 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.train_surrogate import normalize_params
 from src.deim import deim_rom_predict
+from src.device import add_device_argument, device_info, select_device, synchronize
 from src.fno_net import FNO1d
 from src.general_ic_solver import solve_burgers_general_ic
 from src.pod_rom import rom_predict
@@ -57,14 +60,16 @@ rom_predict = partial(rom_predict, timestep_policy="historical")
 
 ROM_MODES = 8
 N_TIMING_REPEATS = 20
+HISTORICAL_OUT_DIR = "report/research"
+HISTORICAL_CHECKPOINT_DIR = "experiments"
+# MLP training time of the historical checkpoint, measured once on Apple MPS (RESEARCH_EXTENSION.md
+# "Offline cost"); the historical training script did not record it. It is only ever reported for
+# that checkpoint and never for a CUDA run.
+HISTORICAL_MLP_TRAIN_TIME_S = 8.23
 
 
 def rel_l2(pred, gt):
     return float(np.linalg.norm(pred - gt) / (np.linalg.norm(gt) + 1e-12))
-
-
-def get_device():
-    return torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
 
 
 def load_deim_basis():
@@ -72,8 +77,8 @@ def load_deim_basis():
     return d["Phi"], d["points"], d["M"], int(d["m"]), int(d["Nx"])
 
 
-def load_mlp(device):
-    ckpt = torch.load("experiments/surrogate_checkpoint.pt", map_location=device,
+def load_mlp(device, checkpoint_dir=HISTORICAL_CHECKPOINT_DIR):
+    ckpt = torch.load(os.path.join(checkpoint_dir, "surrogate_checkpoint.pt"), map_location=device,
                        weights_only=True)
     model = BurgersSurrogateMLP(ckpt["n_save"], ckpt["Nx"]).to(device)
     model.load_state_dict(ckpt["model_state"])
@@ -81,8 +86,9 @@ def load_mlp(device):
     return model, ckpt
 
 
-def load_fno(device):
-    ckpt = torch.load("experiments/fno_checkpoint.pt", map_location=device, weights_only=True)
+def load_fno(device, checkpoint_dir=HISTORICAL_CHECKPOINT_DIR):
+    ckpt = torch.load(os.path.join(checkpoint_dir, "fno_checkpoint.pt"), map_location=device,
+                      weights_only=True)
     model = FNO1d(ckpt["Nx"], ckpt["n_save"], modes=ckpt["modes"], width=ckpt["width"],
                    n_layers=ckpt["n_layers"]).to(device)
     model.load_state_dict(ckpt["model_state"])
@@ -104,8 +110,27 @@ def mlp_predict(model, device, A, nu):
     return out
 
 
-def main():
-    device = get_device()
+def mlp_training_time(checkpoint_dir, device):
+    """(seconds or None, provenance string). A measured sidecar always wins; the historical constant
+    is used only for the historical checkpoint directory and never on CUDA."""
+    meta_path = os.path.join(checkpoint_dir, "surrogate_run_meta.json")
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            meta = json.load(f)
+        return meta["total_train_time_s"], (f"measured by scripts/train_surrogate.py "
+                                            f"({meta['epochs']} epochs, device={meta['device']})")
+    if os.path.normpath(checkpoint_dir) == HISTORICAL_CHECKPOINT_DIR and device.type != "cuda":
+        return HISTORICAL_MLP_TRAIN_TIME_S, ("historical Apple MPS measurement quoted from "
+                                             "RESEARCH_EXTENSION.md, not re-measured in this run")
+    return None, "not measured: no surrogate_run_meta.json next to the checkpoint"
+
+
+def main(device_name="auto", checkpoint_dir=HISTORICAL_CHECKPOINT_DIR, out_dir=HISTORICAL_OUT_DIR,
+         deim_sweep_path="report/research/deim_rank_sweep.json"):
+    device = select_device(device_name)
+    if device.type == "cuda" and os.path.normpath(out_dir) == HISTORICAL_OUT_DIR:
+        raise SystemExit(f"refusing to overwrite the historical results in {HISTORICAL_OUT_DIR}/ with a "
+                         "CUDA run; pass --out-dir (see REMOTE_GPU.md)")
     print(f"Using device: {device}")
 
     Phi, deim_points, M, deim_m, Nx = load_deim_basis()
@@ -114,10 +139,10 @@ def main():
     dealias = np.abs(k) < (2.0 / 3.0) * np.max(np.abs(k))
     x = np.linspace(0, L, Nx, endpoint=False)
 
-    mlp_model, mlp_ckpt = load_mlp(device)
-    fno_model, fno_ckpt = load_fno(device)
+    mlp_model, mlp_ckpt = load_mlp(device, checkpoint_dir)
+    fno_model, fno_ckpt = load_fno(device, checkpoint_dir)
 
-    results = {"device": str(device), "rom_modes": ROM_MODES, "deim_m": deim_m,
+    results = {"device": str(device), "device_info": device_info(device), "rom_modes": ROM_MODES, "deim_m": deim_m,
                "mlp_param_count": sum(p.numel() for p in mlp_model.parameters()),
                "fno_param_count": sum(p.numel() for p in fno_model.parameters())}
 
@@ -234,21 +259,28 @@ def main():
     print("  fno        N/A (structural -- same reason, see src/fno_net.py)")
 
     # ------------------------------------------------------------------------ (5) offline cost --
-    with open("report/research/deim_rank_sweep.json") as f:
+    with open(deim_sweep_path) as f:
         deim_sweep = json.load(f)
     selected_sweep_row = next(r for r in deim_sweep["sweep"] if r["m"] == deim_m)
-    with open("experiments/fno_run_meta.json") as f:
+    with open(os.path.join(checkpoint_dir, "fno_run_meta.json")) as f:
         fno_meta = json.load(f)
+    mlp_train_s, mlp_train_source = mlp_training_time(checkpoint_dir, device)
 
     results["offline_cost_s"] = {
         "pod_basis_construction": deim_sweep["pod_basis_offline_time_s"],
         "deim_nonlinear_snapshot_collection": deim_sweep["nonlinear_snapshot_collection_time_s"],
         "deim_basis_and_point_selection_at_selected_m": selected_sweep_row["deim_offline_time_s"],
-        "mlp_training_200_epochs": 8.23,  # measured, see RESEARCH_EXTENSION.md "Offline cost"
+        "mlp_training_200_epochs": mlp_train_s,
         "fno_training_200_epochs": fno_meta["total_train_time_s"],
         "note": "ROM/DEIM-ROM offline cost also includes the POD basis construction above "
                 "(shared with the plain ROM baseline); DEIM adds only the nonlinear-snapshot "
                 "collection + basis/point-selection rows on top of that shared cost.",
+    }
+    results["offline_cost_provenance"] = {
+        "mlp_training": mlp_train_source,
+        "fno_training": f"{os.path.join(checkpoint_dir, 'fno_run_meta.json')} ({fno_meta['epochs']} "
+                        f"epochs, device={fno_meta['device']})",
+        "pod_and_deim": f"{deim_sweep_path} (NumPy, CPU)",
     }
     print("\n=== (5) Offline cost (one-time, not amortised) ===")
     for k_, v_ in results["offline_cost_s"].items():
@@ -269,9 +301,13 @@ def main():
     rom_time = time_it(lambda: rom_predict(u0_0, Phi, k, nu0, dealias, T=1.0, n_save=n_save))
     deim_time = time_it(lambda: deim_rom_predict(u0_0, Phi, M, deim_points, Nx, nu=nu0, T=1.0,
                                                   n_save=n_save))
+    # Each NN call ends with .cpu().numpy(), which waits for the device; the explicit synchronize()
+    # calls also drain the warm-up before the timer starts (no-op on CPU).
     mlp_predict(mlp_model, device, A0, nu0)  # warm-up (JIT/graph warm-up on first call)
+    synchronize(device)
     mlp_time = time_it(lambda: mlp_predict(mlp_model, device, A0, nu0))
     fno_predict(fno_model, device, u0_0)  # warm-up
+    synchronize(device)
     fno_time = time_it(lambda: fno_predict(fno_model, device, u0_0))
 
     results["online_cost_ms"] = {
@@ -289,11 +325,11 @@ def main():
     print(f"  DEIM-ROM vs solver online speedup:    {solver_time / deim_time:.2f}x")
 
     # ---------------------------------------------------------------------------- save + plot --
-    os.makedirs("report/research", exist_ok=True)
-    with open("report/research/results.json", "w") as f:
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "results.json"), "w") as f:
         json.dump(results, f, indent=2)
 
-    with open("report/research/results_summary.txt", "w") as f:
+    with open(os.path.join(out_dir, "results_summary.txt"), "w") as f:
         f.write("Neural Surrogate vs. POD-ROM vs. DEIM-ROM vs. FNO -- Research Extension\n")
         f.write("Real, measured results only. See RESEARCH_EXTENSION.md for full analysis.\n\n")
         f.write(json.dumps(results, indent=2))
@@ -315,10 +351,17 @@ def main():
         axes[i].set_title(f"A={A_i:.2f}, nu={nu_i:.3f}")
         axes[i].legend(fontsize=7)
     plt.tight_layout()
-    plt.savefig("report/research/comparison_figure.png", dpi=120)
+    plt.savefig(os.path.join(out_dir, "comparison_figure.png"), dpi=120)
 
-    print("\nSaved report/research/results.json, results_summary.txt, comparison_figure.png")
+    print(f"\nSaved {out_dir}/results.json, results_summary.txt, comparison_figure.png")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    add_device_argument(parser)
+    parser.add_argument("--checkpoint-dir", default=HISTORICAL_CHECKPOINT_DIR)
+    parser.add_argument("--out-dir", default=HISTORICAL_OUT_DIR)
+    parser.add_argument("--deim-sweep", default="report/research/deim_rank_sweep.json",
+                        help="DEIM rank-sweep JSON supplying the POD/DEIM offline times")
+    args = parser.parse_args()
+    main(args.device, args.checkpoint_dir, args.out_dir, args.deim_sweep)

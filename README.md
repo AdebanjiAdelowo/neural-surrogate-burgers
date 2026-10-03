@@ -174,6 +174,10 @@ python scripts/evaluate_comparison.py
 
 `evaluate_comparison.py` writes `report/mvp_results.txt` and `report/mvp_comparison.png`.
 
+The neural-network scripts accept `--device {auto,cpu,mps,cuda}`; the solver, ROM and DEIM always run
+in NumPy on the CPU. [`REMOTE_GPU.md`](REMOTE_GPU.md) covers the device policy and running the
+networks on an NVIDIA GPU.
+
 ## Tests
 
 ```bash

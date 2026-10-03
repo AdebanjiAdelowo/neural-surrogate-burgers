@@ -11,3 +11,6 @@ experiments/*_run_meta*.json
 *.pt
 *.pth
 .DS_Store
+
+# backend-specific runs (e.g. CUDA on Colab/Kaggle), kept apart from the historical results
+runs/

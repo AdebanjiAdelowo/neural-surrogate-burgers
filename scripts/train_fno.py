@@ -7,7 +7,7 @@ Mirrors scripts/train_surrogate.py's conventions closely (same seed, optimizer, 
 epoch count, checkpointing-on-best-val-loss) so the two surrogates are trained under matched
 conditions -- an architecture/input-representation comparison, not a training-budget comparison.
 
-Run: python scripts/train_fno.py [--overfit-check] [--epochs N]
+Run: python scripts/train_fno.py [--overfit-check] [--epochs N] [--device D] [--out-dir DIR]
 """
 import argparse
 import json
@@ -21,6 +21,7 @@ import torch.nn as nn
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.device import add_device_argument, device_info, select_device, synchronize
 from src.fno_net import FNO1d
 
 CHECKPOINT_PATH = "experiments/fno_checkpoint.pt"
@@ -30,12 +31,6 @@ RUN_META_PATH = "experiments/fno_run_meta.json"
 def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
-
-
-def get_device():
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
 
 
 def load_split(name, data_prefix=""):
@@ -73,7 +68,7 @@ def overfit_check(device, n_examples=4, steps=500, modes=16, width=32, n_layers=
 
 def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_layers=4, seed=0,
           checkpoint_path=CHECKPOINT_PATH, run_meta_path=RUN_META_PATH, use_nu=False,
-          data_prefix=""):
+          data_prefix="", requested_device=None):
     set_seed(seed)
     u0_train, y_train, nu_train = load_split("train", data_prefix)
     u0_val, y_val, nu_val = load_split("val", data_prefix)
@@ -88,8 +83,9 @@ def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_laye
 
     n = u0_train.shape[0]
     best_val_loss = float("inf")
-    os.makedirs("experiments", exist_ok=True)
+    os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
 
+    synchronize(device)
     t0 = time.perf_counter()
     for epoch in range(epochs):
         model.train()
@@ -119,6 +115,7 @@ def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_laye
         if (epoch + 1) % 20 == 0 or epoch == 0:
             print(f"epoch {epoch + 1}/{epochs}  train_loss={epoch_loss:.6f}  val_loss={val_loss:.6f}")
 
+    synchronize(device)
     total_time = time.perf_counter() - t0
     print(f"Best val_loss: {best_val_loss:.6f} (checkpoint saved to {checkpoint_path})")
 
@@ -129,7 +126,8 @@ def train(device, epochs=200, batch_size=16, lr=1e-3, modes=16, width=32, n_laye
         "modes": modes, "width": width, "n_layers": n_layers, "param_count": param_count,
         "device": str(device), "best_val_loss": best_val_loss, "total_train_time_s": total_time,
         "torch_version": torch.__version__, "n_train_examples": n, "use_nu": use_nu,
-        "data_prefix": data_prefix,
+        "data_prefix": data_prefix, "requested_device": requested_device,
+        "device_info": device_info(device),
     }
     with open(run_meta_path, "w") as f:
         json.dump(run_meta, f, indent=2)
@@ -150,9 +148,12 @@ if __name__ == "__main__":
                         help="file prefix under data/, e.g. aligned_ for data/aligned_train.npz")
     parser.add_argument("--out-prefix", default="",
                         help="prefix for checkpoint/meta names (default: historical names)")
+    parser.add_argument("--out-dir", default="experiments",
+                        help="directory for checkpoints and run metadata (default: historical location)")
+    add_device_argument(parser)
     args = parser.parse_args()
 
-    device = get_device()
+    device = select_device(args.device)
     print(f"Using device: {device}")
 
     if args.overfit_check:
@@ -168,6 +169,6 @@ if __name__ == "__main__":
         name = f"{args.out_prefix}" if args.out_prefix else ""
         train(device, epochs=args.epochs, modes=args.modes, width=args.width,
               n_layers=args.n_layers, seed=args.seed,
-              checkpoint_path=f"experiments/{name}fno_checkpoint{seed_suffix}.pt",
-              run_meta_path=f"experiments/{name}fno_run_meta{seed_suffix}.json",
-              use_nu=args.nu_aware, data_prefix=args.data_prefix)
+              checkpoint_path=os.path.join(args.out_dir, f"{name}fno_checkpoint{seed_suffix}.pt"),
+              run_meta_path=os.path.join(args.out_dir, f"{name}fno_run_meta{seed_suffix}.json"),
+              use_nu=args.nu_aware, data_prefix=args.data_prefix, requested_device=args.device)

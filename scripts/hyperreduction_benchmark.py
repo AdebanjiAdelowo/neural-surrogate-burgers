@@ -15,7 +15,8 @@ experiments/ is touched):
   reference   FOM temporal/spatial reference-resolution check; ROM/DEIM error against a finer FOM.
   dtprobe     exploratory: reduced models at the FOM's step count (is the step rule the limit?)
   ood         out-of-family (two-mode IC) ROM/DEIM accuracy, native and time-aligned protocols
-  fno         FNO seeds: accuracy, timing (CPU and MPS), and the nu-blind irreducible error floor.
+  fno         FNO seeds: accuracy, timing (CPU, plus MPS and/or CUDA when present, each labelled
+              separately), and the nu-blind irreducible error floor.
 
 Run:  python scripts/hyperreduction_benchmark.py <stage> [--tag TAG]
 """
@@ -103,6 +104,10 @@ def environment_info():
         info["torch"] = torch.__version__
         info["torch_threads"] = torch.get_num_threads()
         info["mps_available"] = bool(torch.backends.mps.is_available())
+        info["cuda_available"] = bool(torch.cuda.is_available())
+        if torch.cuda.is_available():
+            info["cuda_device"] = torch.cuda.get_device_name(0)
+            info["cuda_runtime"] = torch.version.cuda
     except Exception:
         pass
     return info
@@ -989,6 +994,7 @@ def stage_ood(tag):
 # ===================================================================================== stage: fno
 def stage_fno(tag):
     import torch
+    from src.device import timing_devices
     from src.fno_net import FNO1d
     env = environment_info()
     data = load_data()
@@ -1053,13 +1059,16 @@ def stage_fno(tag):
 
     # timing, batch 1, output moved to host (same protocol as the historical FNO timing)
     timing = {}
-    for dev in ["cpu"] + (["mps"] if torch.backends.mps.is_available() else []):
+    for dev in timing_devices():
         m, _ = load(ckpts[0], dev)
         x = torch.from_numpy(tU[0, 0].astype(np.float32)).unsqueeze(0).to(dev)
 
         def call():
             with torch.no_grad():
-                return m(x).cpu().numpy()[0]
+                out = m(x).cpu().numpy()[0]
+            if dev == "cuda":  # the host copy already blocks; the sync makes the bracket explicit
+                torch.cuda.synchronize()
+            return out
         t = interleaved_timing({"fno": call}, reps=200, warmup=10)["fno"]
         timing[dev] = {"ms": stats(np.array(t) * 1e3)}
         print(f"FNO {dev}: median {timing[dev]['ms']['median']:.3f} ms (batch 1, incl. host copy)")
