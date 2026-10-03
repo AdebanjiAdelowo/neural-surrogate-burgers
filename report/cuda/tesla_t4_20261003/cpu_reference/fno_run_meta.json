@@ -1,0 +1,25 @@
+{
+  "model": "FNO1d",
+  "epochs": 200,
+  "batch_size": 16,
+  "lr": 0.001,
+  "seed": 0,
+  "modes": 16,
+  "width": 32,
+  "n_layers": 4,
+  "param_count": 137108,
+  "device": "cpu",
+  "best_val_loss": 0.0005367102567106485,
+  "total_train_time_s": 44.6557807879999,
+  "torch_version": "2.11.0+cu130",
+  "n_train_examples": 200,
+  "use_nu": false,
+  "data_prefix": "",
+  "requested_device": "cpu",
+  "device_info": {
+    "device": "cpu",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39"
+  }
+}

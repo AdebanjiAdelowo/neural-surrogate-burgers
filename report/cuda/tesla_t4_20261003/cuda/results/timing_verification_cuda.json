@@ -1,0 +1,109 @@
+{
+  "device": "cuda",
+  "device_info": {
+    "device": "cuda",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+    "gpu_name": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
+    "cuda_runtime": "13.0",
+    "cudnn": 92700,
+    "tf32_matmul": false,
+    "tf32_cudnn": false,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false
+  },
+  "n_calls_per_trial": 20,
+  "n_trials": 7,
+  "timing_ms": {
+    "solver": {
+      "trial_means": [
+        22.524299899987454,
+        23.578926799996225,
+        22.379116849992897,
+        23.832505300015328,
+        22.70943589999206,
+        22.72840799998903,
+        23.110302000009142
+      ],
+      "median": 22.72840799998903,
+      "mean_of_trials": 22.98042782142602,
+      "std_of_trials": 0.5081735552928245,
+      "min": 22.379116849992897,
+      "max": 23.832505300015328
+    },
+    "rom": {
+      "trial_means": [
+        66.5270077500054,
+        95.54299925000578,
+        69.65235229999962,
+        55.1160665999987,
+        55.743901150003694,
+        55.22423434999837,
+        55.90336610000577
+      ],
+      "median": 55.90336610000577,
+      "mean_of_trials": 64.81570392857391,
+      "std_of_trials": 13.72325986999018,
+      "min": 55.1160665999987,
+      "max": 95.54299925000578
+    },
+    "deim_rom": {
+      "trial_means": [
+        13.8542535499937,
+        13.084385299998758,
+        13.019925100002183,
+        13.17260029998124,
+        13.42315654999311,
+        13.04436729999452,
+        12.15075700001762
+      ],
+      "median": 13.084385299998758,
+      "mean_of_trials": 13.10706358571159,
+      "std_of_trials": 0.47645464424050404,
+      "min": 12.15075700001762,
+      "max": 13.8542535499937
+    },
+    "mlp": {
+      "trial_means": [
+        0.23029625001527165,
+        0.23256854999544885,
+        0.2073399499977313,
+        0.21587285000350676,
+        0.22905714999978954,
+        0.20917765000376676,
+        0.21601835001092695
+      ],
+      "median": 0.21601835001092695,
+      "mean_of_trials": 0.2200472500037774,
+      "std_of_trials": 0.009682713468368848,
+      "min": 0.2073399499977313,
+      "max": 0.23256854999544885
+    },
+    "fno": {
+      "trial_means": [
+        2.04017329999715,
+        1.9661649499994382,
+        1.8410211499940488,
+        1.8593384000041624,
+        1.8177551500002664,
+        2.009411399990313,
+        2.3710331000074802
+      ],
+      "median": 1.9661649499994382,
+      "mean_of_trials": 1.9864139214275514,
+      "std_of_trials": 0.17626842983251098,
+      "min": 1.8177551500002664,
+      "max": 2.3710331000074802
+    }
+  },
+  "speedups": {
+    "deim_rom_vs_rom": 4.272525213699652,
+    "deim_rom_vs_solver": 1.7370634904790818,
+    "mlp_vs_solver": 105.21517268713214,
+    "fno_vs_solver": 11.559766641143472
+  },
+  "deim_rom_profile_text": "         14721 function calls in 0.254 seconds\n\n   Ordered by: cumulative time\n   List reduced from 47 to 12 due to restriction <12>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n       20    0.001    0.000    0.254    0.013 deim.py:294(deim_rom_predict)\n       20    0.058    0.003    0.253    0.013 deim.py:198(deim_rom_reduced_trajectory)\n    12560    0.192    0.000    0.192    0.000 deim.py:255(deim_rhs)\n       20    0.001    0.000    0.001    0.000 function_base.py:25(linspace)\n       20    0.000    0.000    0.001    0.000 deim.py:128(_stencil_support)\n       20    0.000    0.000    0.001    0.000 _arraysetops_impl.py:145(unique)\n       20    0.000    0.000    0.000    0.000 _arraysetops_impl.py:344(_unique1d)\n      400    0.000    0.000    0.000    0.000 {method 'copy' of 'numpy.ndarray' objects}\n       40    0.000    0.000    0.000    0.000 {built-in method numpy.array}\n      760    0.000    0.000    0.000    0.000 {method 'append' of 'list' objects}\n       20    0.000    0.000    0.000    0.000 {method 'max' of 'numpy.ndarray' objects}\n       20    0.000    0.000    0.000    0.000 fromnumeric.py:1464(searchsorted)\n\n\n"
+}

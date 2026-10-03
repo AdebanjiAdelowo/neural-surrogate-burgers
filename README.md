@@ -176,7 +176,8 @@ python scripts/evaluate_comparison.py
 
 The neural-network scripts accept `--device {auto,cpu,mps,cuda}`; the solver, ROM and DEIM always run
 in NumPy on the CPU. [`REMOTE_GPU.md`](REMOTE_GPU.md) covers the device policy and running the
-networks on an NVIDIA GPU.
+networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
+[`report/cuda/tesla_t4_20261003/`](report/cuda/tesla_t4_20261003/README.md).
 
 ## Tests
 

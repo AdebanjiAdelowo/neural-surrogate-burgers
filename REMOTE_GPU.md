@@ -148,6 +148,12 @@ and `results/` with `results.json`, `results_summary.txt`, `comparison_figure.pn
 `cpu_reference/`, `data_provenance.json`, `provenance.json`, `deim_rank_sweep_this_machine.json`,
 `build_deim.log`, `pytest.log`, `git_status.txt`, `nvidia_smi.txt` and `pip_freeze.txt`.
 
+## Completed runs
+
+* [`report/cuda/tesla_t4_20261003/`](report/cuda/tesla_t4_20261003/README.md): Tesla T4 on Colab,
+  historical data. MLP and FNO accuracy matches the committed MPS results to within 1.2e-6 relative;
+  timings are T4 versus the same runtime's CPU only.
+
 ## Kaggle (additional environment, not verified)
 
 The same commands should work in a Kaggle GPU notebook, but this environment has not been tested;

@@ -1,0 +1,107 @@
+{
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "in_distribution": {
+    "mean_across_seeds": 0.02930869437986985,
+    "std_across_seeds": 0.0009704437247982885,
+    "per_seed": [
+      0.02864121098536998,
+      0.030680940276943146,
+      0.02860393187729642
+    ]
+  },
+  "out_of_family_ic": {
+    "mean_across_seeds": 0.23406379707157612,
+    "std_across_seeds": 0.005274490905919967,
+    "per_seed": [
+      0.24101869743317367,
+      0.2329213848337531,
+      0.2282513089478016
+    ]
+  },
+  "parameter_extrapolation": {
+    "A above (2.5)": {
+      "mean_across_seeds": 0.06167729323108991,
+      "std_across_seeds": 0.0009275047198807212,
+      "per_seed": [
+        0.06128716468811035,
+        0.060787808150053024,
+        0.06295690685510635
+      ]
+    },
+    "nu above (0.15)": {
+      "mean_across_seeds": 0.06474548081556956,
+      "std_across_seeds": 0.0018590190312325278,
+      "per_seed": [
+        0.06717025488615036,
+        0.06265316158533096,
+        0.06441302597522736
+      ]
+    },
+    "A below (0.2)": {
+      "mean_across_seeds": 0.12022475649913152,
+      "std_across_seeds": 0.03343484492844097,
+      "per_seed": [
+        0.1664450466632843,
+        0.10575155913829803,
+        0.08847766369581223
+      ]
+    }
+  },
+  "per_seed_detail": {
+    "0": {
+      "best_val_loss": 0.0005367106641642749,
+      "in_distribution_mean": 0.02864121098536998,
+      "in_distribution_std": 0.014255849273525635,
+      "out_of_family_ic_mean": 0.24101869743317367,
+      "out_of_family_ic_std": 0.13947228504775347,
+      "parameter_extrapolation": {
+        "A above (2.5)": 0.06128716468811035,
+        "nu above (0.15)": 0.06717025488615036,
+        "A below (0.2)": 0.1664450466632843
+      }
+    },
+    "1": {
+      "best_val_loss": 0.0005331274005584419,
+      "in_distribution_mean": 0.030680940276943146,
+      "in_distribution_std": 0.016480721540397977,
+      "out_of_family_ic_mean": 0.2329213848337531,
+      "out_of_family_ic_std": 0.13868470660261836,
+      "parameter_extrapolation": {
+        "A above (2.5)": 0.060787808150053024,
+        "nu above (0.15)": 0.06265316158533096,
+        "A below (0.2)": 0.10575155913829803
+      }
+    },
+    "2": {
+      "best_val_loss": 0.0004861078632529825,
+      "in_distribution_mean": 0.02860393187729642,
+      "in_distribution_std": 0.016494414026955125,
+      "out_of_family_ic_mean": 0.2282513089478016,
+      "out_of_family_ic_std": 0.13632922116910162,
+      "parameter_extrapolation": {
+        "A above (2.5)": 0.06295690685510635,
+        "nu above (0.15)": 0.06441302597522736,
+        "A below (0.2)": 0.08847766369581223
+      }
+    }
+  },
+  "device_info": {
+    "device": "cuda",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+    "gpu_name": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
+    "cuda_runtime": "13.0",
+    "cudnn": 92700,
+    "tf32_matmul": false,
+    "tf32_cudnn": false,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "run_id": null,
+  "repo": "https://github.com/AdebanjiAdelowo/neural-surrogate-burgers.git",
+  "ref": "abaabba6e2b048f888f4a71595c7c4beb34a2503",
+  "commit": "abaabba6e2b048f888f4a71595c7c4beb34a2503",
+  "dirty_at_start": false,
+  "device_info": {
+    "device": "cuda",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+    "gpu_name": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
+    "cuda_runtime": "13.0",
+    "cudnn": 92700,
+    "tf32_matmul": false,
+    "tf32_cudnn": false,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false
+  },
+  "data": {
+    "source": "upload",
+    "like_for_like_with_historical_mps": true,
+    "deim_basis": "uploaded historical",
+    "deim_rebuild_check": {
+      "points_identical": true,
+      "Phi_max_abs_diff_up_to_column_sign": 9.41635007814523e-15
+    },
+    "pod_deim_offline_times": "runs/cuda_20261003T091216Z/deim_rank_sweep_this_machine.json (measured on this machine, NumPy CPU)",
+    "files": {
+      "data/train.npz": {
+        "sha256": "233f9eeae594d82f0e97bb53a90d039dbcc4f10c85012fe5a34a086fd88450ee",
+        "is_historical": true
+      },
+      "data/val.npz": {
+        "sha256": "0d083b211f660215976a52661df28702cf04d991ead8502ca394265f2068346f",
+        "is_historical": true
+      },
+      "data/test.npz": {
+        "sha256": "a3542f1169912c0749571476640ee7e543dc0d35d61a0c3bb48f829854520e59",
+        "is_historical": true
+      },
+      "data/ood_family_test.npz": {
+        "sha256": "f69a55bd219ae908b89676c45062f967a5975f19f754906f0fe0a0025d206116",
+        "is_historical": true
+      },
+      "experiments/deim_basis.npz": {
+        "sha256": "97f28e8dc6e24e8ec0a34a1f25ecc19e660f3eee36f0333aa1cea2101592cb23",
+        "is_historical": true
+      }
+    }
+  },
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "cpu_reference": true,
+  "checkpoint_portability_max_abs_diff": 1.0728836059570312e-06,
+  "python": "3.13.15",
+  "numpy": "2.1.3",
+  "torch": "2.11.0+cu130",
+  "note": "CUDA backend experiment; it does not replace the committed CPU/MPS results in report/."
+}

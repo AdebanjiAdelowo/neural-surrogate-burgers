@@ -1,0 +1,20 @@
+{
+  "model": "BurgersSurrogateMLP",
+  "epochs": 200,
+  "batch_size": 16,
+  "lr": 0.001,
+  "seed": 0,
+  "param_count": 363648,
+  "device": "cpu",
+  "requested_device": "cpu",
+  "device_info": {
+    "device": "cpu",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39"
+  },
+  "best_val_loss": 3.8604670407949015e-05,
+  "total_train_time_s": 19.554037670999605,
+  "torch_version": "2.11.0+cu130",
+  "n_train_examples": 200
+}

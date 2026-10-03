@@ -1,0 +1,32 @@
+{
+  "source": "upload",
+  "like_for_like_with_historical_mps": true,
+  "deim_basis": "uploaded historical",
+  "deim_rebuild_check": {
+    "points_identical": true,
+    "Phi_max_abs_diff_up_to_column_sign": 9.41635007814523e-15
+  },
+  "pod_deim_offline_times": "runs/cuda_20261003T091216Z/deim_rank_sweep_this_machine.json (measured on this machine, NumPy CPU)",
+  "files": {
+    "data/train.npz": {
+      "sha256": "233f9eeae594d82f0e97bb53a90d039dbcc4f10c85012fe5a34a086fd88450ee",
+      "is_historical": true
+    },
+    "data/val.npz": {
+      "sha256": "0d083b211f660215976a52661df28702cf04d991ead8502ca394265f2068346f",
+      "is_historical": true
+    },
+    "data/test.npz": {
+      "sha256": "a3542f1169912c0749571476640ee7e543dc0d35d61a0c3bb48f829854520e59",
+      "is_historical": true
+    },
+    "data/ood_family_test.npz": {
+      "sha256": "f69a55bd219ae908b89676c45062f967a5975f19f754906f0fe0a0025d206116",
+      "is_historical": true
+    },
+    "experiments/deim_basis.npz": {
+      "sha256": "97f28e8dc6e24e8ec0a34a1f25ecc19e660f3eee36f0333aa1cea2101592cb23",
+      "is_historical": true
+    }
+  }
+}

@@ -1,0 +1,120 @@
+Neural Surrogate vs. POD-ROM vs. DEIM-ROM vs. FNO -- Research Extension
+Real, measured results only. See RESEARCH_EXTENSION.md for full analysis.
+
+{
+  "device": "cpu",
+  "device_info": {
+    "device": "cpu",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39"
+  },
+  "rom_modes": 8,
+  "deim_m": 16,
+  "mlp_param_count": 363648,
+  "fno_param_count": 137108,
+  "in_distribution": {
+    "rom": {
+      "mean": 0.0015176732857071328,
+      "std": 0.0007743102572108445,
+      "n": 40
+    },
+    "deim_rom": {
+      "mean": 0.043533875432331115,
+      "std": 0.09344359728540304,
+      "n": 40
+    },
+    "mlp": {
+      "mean": 0.00787925604963675,
+      "std": 0.003660755569069674,
+      "n": 40
+    },
+    "fno": {
+      "mean": 0.02864121033344418,
+      "std": 0.014255856020922835,
+      "n": 40
+    }
+  },
+  "parameter_extrapolation": [
+    {
+      "label": "A above training range (2.5 > 2.0)",
+      "A": 2.5,
+      "nu": 0.05,
+      "rom_err": 0.0010247891768813133,
+      "deim_rom_err": 0.19956058263778687,
+      "mlp_err": 0.054485585540533066,
+      "fno_err": 0.06128716468811035
+    },
+    {
+      "label": "nu above training range (0.15 > 0.10)",
+      "A": 1.0,
+      "nu": 0.15,
+      "rom_err": 0.002400720724835992,
+      "deim_rom_err": 0.0023722758051007986,
+      "mlp_err": 0.030478518456220627,
+      "fno_err": 0.06717026233673096
+    },
+    {
+      "label": "A below training range (0.2 < 0.5)",
+      "A": 0.2,
+      "nu": 0.05,
+      "rom_err": 0.0005941539420746267,
+      "deim_rom_err": 0.0005791927687823772,
+      "mlp_err": 0.5595303773880005,
+      "fno_err": 0.16644498705863953
+    }
+  ],
+  "out_of_family_ic": {
+    "rom": {
+      "mean": 0.016891663213027642,
+      "std": 0.02541754355362217,
+      "n": 20
+    },
+    "deim_rom": {
+      "mean": 0.031106920866295695,
+      "std": 0.05924624893856234,
+      "n": 20
+    },
+    "fno": {
+      "mean": 0.24101872369647026,
+      "std": 0.13947230198689514,
+      "n": 20
+    },
+    "mlp": "N/A (structural): the MLP surrogate's input is the 2-scalar pair (A, nu); a two-mode initial condition has no such representation, so the MLP cannot be evaluated on this test at all -- not merely inaccurately, but not applicable, unlike the FNO/ROM/DEIM-ROM which all accept the actual field."
+  },
+  "temporal_extrapolation_T2": {
+    "rom": {
+      "mean": 0.0016885378063307144,
+      "std": 0.0007129297535559966,
+      "n": 8
+    },
+    "deim_rom": {
+      "mean": 0.03115000986144878,
+      "std": 0.03875319286689925,
+      "n": 8
+    },
+    "mlp": "N/A (structural): fixed output size sized for T=1.0's 20 snapshots cannot represent a T=2.0 trajectory.",
+    "fno": "N/A (structural, same reason as MLP -- this module's FNO is a single-shot full-trajectory regressor, not an autoregressive one-step operator; see src/fno_net.py docstring for why that design was chosen and what capability it deliberately does not test."
+  },
+  "offline_cost_s": {
+    "pod_basis_construction": 0.1025633550002567,
+    "deim_nonlinear_snapshot_collection": 0.3786586159999388,
+    "deim_basis_and_point_selection_at_selected_m": 0.10036610499992094,
+    "mlp_training_200_epochs": 19.554037670999605,
+    "fno_training_200_epochs": 44.6557807879999,
+    "note": "ROM/DEIM-ROM offline cost also includes the POD basis construction above (shared with the plain ROM baseline); DEIM adds only the nonlinear-snapshot collection + basis/point-selection rows on top of that shared cost."
+  },
+  "offline_cost_provenance": {
+    "mlp_training": "measured by scripts/train_surrogate.py (200 epochs, device=cpu)",
+    "fno_training": "runs/cuda_20261003T091216Z/cpu_reference/fno_run_meta.json (200 epochs, device=cpu)",
+    "pod_and_deim": "runs/cuda_20261003T091216Z/deim_rank_sweep_this_machine.json (NumPy, CPU)"
+  },
+  "online_cost_ms": {
+    "solver": 22.44251184999939,
+    "rom": 58.71421019999161,
+    "deim_rom": 13.483204800013482,
+    "mlp": 0.25439300000016374,
+    "fno": 2.0759773000008863,
+    "note": "mean of 20 calls, same machine/session as offline timings above; device=cpu; NN methods include a single untimed warm-up call before timing (JIT/graph warm-up), matching evaluate_comparison.py's existing methodology."
+  }
+}

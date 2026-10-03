@@ -1,0 +1,126 @@
+{
+  "device": "cuda",
+  "device_info": {
+    "device": "cuda",
+    "torch_version": "2.11.0+cu130",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+    "gpu_name": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
+    "cuda_runtime": "13.0",
+    "cudnn": 92700,
+    "tf32_matmul": false,
+    "tf32_cudnn": false,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false
+  },
+  "rom_modes": 8,
+  "deim_m": 16,
+  "mlp_param_count": 363648,
+  "fno_param_count": 137108,
+  "in_distribution": {
+    "rom": {
+      "mean": 0.0015176732857071328,
+      "std": 0.0007743102572108445,
+      "n": 40
+    },
+    "deim_rom": {
+      "mean": 0.043533875432331115,
+      "std": 0.09344359728540304,
+      "n": 40
+    },
+    "mlp": {
+      "mean": 0.007879253261489794,
+      "std": 0.003660751997460241,
+      "n": 40
+    },
+    "fno": {
+      "mean": 0.02864121098536998,
+      "std": 0.014255849273525635,
+      "n": 40
+    }
+  },
+  "parameter_extrapolation": [
+    {
+      "label": "A above training range (2.5 > 2.0)",
+      "A": 2.5,
+      "nu": 0.05,
+      "rom_err": 0.0010247891768813133,
+      "deim_rom_err": 0.19956058263778687,
+      "mlp_err": 0.05448557808995247,
+      "fno_err": 0.06128716468811035
+    },
+    {
+      "label": "nu above training range (0.15 > 0.10)",
+      "A": 1.0,
+      "nu": 0.15,
+      "rom_err": 0.002400720724835992,
+      "deim_rom_err": 0.0023722758051007986,
+      "mlp_err": 0.03047853522002697,
+      "fno_err": 0.06717025488615036
+    },
+    {
+      "label": "A below training range (0.2 < 0.5)",
+      "A": 0.2,
+      "nu": 0.05,
+      "rom_err": 0.0005941539420746267,
+      "deim_rom_err": 0.0005791927687823772,
+      "mlp_err": 0.5595300197601318,
+      "fno_err": 0.1664450466632843
+    }
+  ],
+  "out_of_family_ic": {
+    "rom": {
+      "mean": 0.016891663213027642,
+      "std": 0.02541754355362217,
+      "n": 20
+    },
+    "deim_rom": {
+      "mean": 0.031106920866295695,
+      "std": 0.05924624893856234,
+      "n": 20
+    },
+    "fno": {
+      "mean": 0.24101869743317367,
+      "std": 0.13947228504775347,
+      "n": 20
+    },
+    "mlp": "N/A (structural): the MLP surrogate's input is the 2-scalar pair (A, nu); a two-mode initial condition has no such representation, so the MLP cannot be evaluated on this test at all -- not merely inaccurately, but not applicable, unlike the FNO/ROM/DEIM-ROM which all accept the actual field."
+  },
+  "temporal_extrapolation_T2": {
+    "rom": {
+      "mean": 0.0016885378063307144,
+      "std": 0.0007129297535559966,
+      "n": 8
+    },
+    "deim_rom": {
+      "mean": 0.03115000986144878,
+      "std": 0.03875319286689925,
+      "n": 8
+    },
+    "mlp": "N/A (structural): fixed output size sized for T=1.0's 20 snapshots cannot represent a T=2.0 trajectory.",
+    "fno": "N/A (structural, same reason as MLP -- this module's FNO is a single-shot full-trajectory regressor, not an autoregressive one-step operator; see src/fno_net.py docstring for why that design was chosen and what capability it deliberately does not test."
+  },
+  "offline_cost_s": {
+    "pod_basis_construction": 0.1025633550002567,
+    "deim_nonlinear_snapshot_collection": 0.3786586159999388,
+    "deim_basis_and_point_selection_at_selected_m": 0.10036610499992094,
+    "mlp_training_200_epochs": 5.585387930000252,
+    "fno_training_200_epochs": 20.61157201900005,
+    "note": "ROM/DEIM-ROM offline cost also includes the POD basis construction above (shared with the plain ROM baseline); DEIM adds only the nonlinear-snapshot collection + basis/point-selection rows on top of that shared cost."
+  },
+  "offline_cost_provenance": {
+    "mlp_training": "measured by scripts/train_surrogate.py (200 epochs, device=cuda)",
+    "fno_training": "runs/cuda_20261003T091216Z/cuda/fno_run_meta.json (200 epochs, device=cuda)",
+    "pod_and_deim": "runs/cuda_20261003T091216Z/deim_rank_sweep_this_machine.json (NumPy, CPU)"
+  },
+  "online_cost_ms": {
+    "solver": 21.73425160001443,
+    "rom": 52.218573499999366,
+    "deim_rom": 10.767305399986071,
+    "mlp": 0.2976191000016115,
+    "fno": 1.9602966000093147,
+    "note": "mean of 20 calls, same machine/session as offline timings above; device=cuda; NN methods include a single untimed warm-up call before timing (JIT/graph warm-up), matching evaluate_comparison.py's existing methodology."
+  }
+}
