@@ -125,8 +125,11 @@ is a reference "best" backend; differences of the size of the seed-to-seed sprea
 ## Google Colab (supported target)
 
 Open `colab/run_cuda.ipynb` with a GPU runtime, set `REF` to the commit to test, and upload
-`historical_inputs.zip` to `/content/` (or when prompted). Every shell command goes through a helper
-that raises on failure, and every cell after the gate re-checks it. The notebook:
+`historical_inputs.zip` to `/content/` (or when prompted); the archive is always kept outside the
+repository checkout. Every shell command goes through a helper that raises on failure, and every cell
+after the gate re-checks it. A session gets one `RUN_ID` (section 3), which re-running section 0 to
+set `RUN_FULL = True` does not reset; the run directory, `provenance.json` and the archive name all
+use it. The notebook:
 
 1. prints `nvidia-smi`, Python, PyTorch, the CUDA version and the GPU name;
 2. clones the repository, checks out `REF`, and prints the commit and its dirty state;
