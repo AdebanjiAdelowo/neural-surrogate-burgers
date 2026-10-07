@@ -1,0 +1,10 @@
+# Handoff: Burgers ROM/DEIM/FNO verification
+
+## Current scientific status
+The viscous periodic Burgers benchmark and pseudo-spectral FOM are appropriate. POD-Galerkin, DEIM/local finite-difference hyper-reduction and FNO are legitimate but answer different approximation questions. Projection error, reduced-dynamics error, hyper-reduction error and learned-operator generalization must remain separate. A historical ROM timestep policy could be unstable for stiff reduced diffusion spectra; the revised policy accounts for the reduced operator/RK4 stability. Historical results remain provenance, not current evidence.
+
+## Local work
+Run the full tests, especially timestep-policy, POD operator, DEIM no-full-grid-touch and follow-up audit tests. Reproduce FOM/snapshot contract, POD projection curves, Galerkin accuracy/stability, DEIM error/speed and FNO multi-seed results. Compare viscosity-aware and viscosity-blind models only as distinct model definitions. Keep offline cost, online ROM cost, FOM cost, NN training and NN inference timings separate. Reproduce CUDA results only on matching hardware/provenance if headline timings are updated.
+
+## Claude prompt
+Continue the scientific audit of neural-surrogate-burgers. Read this handoff, docs/scientific_audit.md, README, timestep-policy tests, POD/DEIM tests and CUDA report provenance. Run all tests. Verify FOM timestep/snapshot alignment, POD projection independently of ROM dynamics, reduced-operator correctness, RK4 stability under the revised timestep policy, and DEIM/local-FD hyper-reduction without hidden full-grid work. Reproduce multi-seed FNO results and distinguish interpolation from viscosity extrapolation. Never mix offline/training cost with online/inference timing. Preserve historical unstable-policy results as historical. Show old/new evidence before commits; do not merge or force-push.
