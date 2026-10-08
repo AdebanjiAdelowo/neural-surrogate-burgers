@@ -4,6 +4,18 @@ A comparative study of a classical linear reduced-order model (POD-Galerkin) aga
 neural surrogate for the 1D viscous Burgers' equation, evaluated on in-distribution accuracy,
 wall-clock runtime, and generalisation to parameters outside the training range.
 
+## Scientific status at a glance
+
+| | |
+|---|---|
+| **Problem** | Parametric 1D viscous Burgers equation |
+| **Methods** | Pseudo-spectral FOM, POD-Galerkin ROM, DEIM/local-FD hyper-reduction, MLP and FNO surrogates |
+| **Verification** | Physical diagnostics, grid checks, POD/operator tests, DEIM isolation tests, time-step stability checks and multi-seed learned models |
+| **Headline result** | The classical ROM is exceptionally accurate for this compressible solution family; learned models are fast in-distribution but degrade under extrapolation |
+| **Main qualification** | Conclusions are specific to the tested initial-condition/viscosity family, architectures and laptop/T4-scale benchmarks |
+
+**Read first:** the Results, Tests and Limitations sections.
+
 ## Overview
 
 Reduced-order and surrogate modelling are widely used to accelerate simulation in scientific
