@@ -1,5 +1,7 @@
 # Neural Surrogate vs. POD-Galerkin ROM for the Viscous Burgers' Equation
 
+[![Scientific CI](https://github.com/AdebanjiAdelowo/neural-surrogate-burgers/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AdebanjiAdelowo/neural-surrogate-burgers/actions/workflows/ci.yml)
+
 A comparative study of a classical linear reduced-order model (POD-Galerkin) against a data-driven
 neural surrogate for the 1D viscous Burgers' equation, evaluated on in-distribution accuracy,
 wall-clock runtime, and generalisation to parameters outside the training range.
