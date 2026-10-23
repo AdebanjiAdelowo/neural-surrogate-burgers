@@ -1,8 +1,31 @@
 # Neural Surrogate vs. POD-Galerkin ROM for the Viscous Burgers' Equation
 
+[![Scientific CI](https://github.com/AdebanjiAdelowo/neural-surrogate-burgers/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AdebanjiAdelowo/neural-surrogate-burgers/actions/workflows/ci.yml)
+
 A comparative study of a classical linear reduced-order model (POD-Galerkin) against a data-driven
 neural surrogate for the 1D viscous Burgers' equation, evaluated on in-distribution accuracy,
 wall-clock runtime, and generalisation to parameters outside the training range.
+
+
+## Project overview
+
+A detailed PDE simulation can be accurate but expensive when it must be repeated for many parameter choices. This project compares two ways of building faster approximations for the one-dimensional viscous Burgers equation: a classical reduced-order model derived from the governing equation, and neural surrogates learned from simulation data.
+
+The classical route uses Proper Orthogonal Decomposition (POD), Galerkin projection and DEIM-style hyper-reduction. The learned route uses an MLP and a Fourier Neural Operator (FNO). Keeping both approaches in one repository makes it possible to compare not only accuracy and speed, but also what happens when the test problem moves outside the conditions represented in training.
+
+For the tested solution family, the classical ROM is extremely accurate, while the learned models are fast in distribution but degrade under extrapolation. Those conclusions are intentionally limited to the parameter ranges, architectures and hardware studied here.
+
+## Scientific status at a glance
+
+| | |
+|---|---|
+| **Problem** | Parametric 1D viscous Burgers equation |
+| **Methods** | Pseudo-spectral FOM, POD-Galerkin ROM, DEIM/local-FD hyper-reduction, MLP and FNO surrogates |
+| **Verification** | Physical diagnostics, grid checks, POD/operator tests, DEIM isolation tests, time-step stability checks and multi-seed learned models |
+| **Headline result** | The classical ROM is exceptionally accurate for this compressible solution family; learned models are fast in-distribution but degrade under extrapolation |
+| **Main qualification** | Conclusions are specific to the tested initial-condition/viscosity family, architectures and laptop/T4-scale benchmarks |
+
+**Read first:** the Results, Tests and Limitations sections.
 
 ## Overview
 
