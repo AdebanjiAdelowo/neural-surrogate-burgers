@@ -10,7 +10,7 @@ time stepping can be made cheaper.
 
 An exact reference is computed with the Cole-Hopf transformation (Hopf integral form, evaluated stably
 with a log-sum-exp shift). It agrees with an independent FOM run at N = 8192 to 4.3e-12 on the steepest
-case, and its estimated uncertainty is at most 2.2e-11 over all 51 checked cases. Against it:
+case, and its estimated uncertainty is at most 2.2e-11 over all 48 checked cases. Against it:
 
 * The FOM converges spectrally in space and at fourth order in time. **N = 128 is not sufficient**: on
   the 40 test cases its error has mean 0.42% and maximum 4.4% (five cases above 1%), the steepest
@@ -167,7 +167,7 @@ but the dominant FOM error at N = 2048 on the steepest cases (Section 10).
 
 ## 7. Reference verification and uncertainty (`reference_run1.json`, Figure 4)
 
-For all 11 representative and all 40 test cases:
+For the 11 representative and the 40 test cases (48 distinct cases: test cases 0, 5 and 33 are in both sets):
 
 * quadrature refinement (step halved): at most 4.7e-16;
 * sampling: the energy of the exact solution beyond |k| = N_ref/4 on the N_ref = 8192 grid is at most
@@ -185,7 +185,7 @@ For all 11 representative and all 40 test cases:
 The discrepancy falls by 16 with each doubling of the step count (temporal error of the FOM) and not with
 N, so it is the FOM, not the reference, that limits the agreement. **Estimated reference uncertainty:**
 for each case the larger of the quadrature-refinement change and the smallest FOM discrepancy; the
-maximum over all 51 cases is 2.2e-11 (space-time) and 4.9e-11 (worst snapshot). This is an upper bound:
+maximum over all 48 cases is 2.2e-11 (space-time) and 4.9e-11 (worst snapshot). This is an upper bound:
 the 40 test cases were checked only against the N = 4096 FOM with its baseline step count, whose own
 temporal error dominates that value. All errors quoted as "against the exact solution" carry this
 uncertainty; values below about 1e-11 are not resolved by it.
@@ -379,18 +379,26 @@ spread over the A/nu range). Run 2; run 1 agrees within 20% on every entry.
 
 * The FOM cost grows like N^2 log N (more points and proportionally more steps): 4.0, 29.7, 316 ms.
 * Tensorial POD at r = 8 with the reduced CFL step (P1) costs 0.95, 5.7 and 4.9 ms: its cost saturates in
-  N (rho(L) saturates), giving 4.2x, 5.2x and 65x over the FOM; the current policy P0 grows with N through
-  its dx-based bound (1.4, 7.8, 19.3 ms).
+  N (rho(L) saturates), giving 4.2x, 5.2x and 65x over the FOM at the same N (61x in run 1); the current
+  policy P0 grows with N through its dx-based bound (1.4, 7.8, 19.3 ms). These are cost ratios at equal
+  N, not at equal accuracy: at N = 2048 the FOM's error is 2.4e-11 and the r = 8 ROM's 5.4e-4.
 * At r = 16 and r = 32 the diffusion bound (rho(L) up to 5.8e4 at r = 16) dominates every explicit policy:
   r = 32 at N = 2048 takes about 0.95 s, three times the FOM. The implicit Radau policy of Section 11
   (11.4 ms at N = 2048, r = 16 on the 40 test cases) removes this; it was not part of this benchmark.
 * Offline: SVD 0.05 s / 0.38 s / 4.6 s (N = 128 / 512 / 2048) plus the training FOM runs (Section 9).
 
-**Accuracy-runtime trade-off** (against the exact solution): at about 5 ms, the N = 128 FOM gives 2.0e-3,
-while a tensorial POD model built at N = 2048 with r = 8 and the P1 step gives 5.4e-4 (four times more
-accurate at the same cost). For errors near 1e-6, the N = 512 FOM (29.7 ms, 1.4e-6) and r = 16 tensorial
-POD at N = 2048 with explicit steps (49 ms, 6.3e-7) are comparable; with Radau (about 11 ms in Section 11)
-the reduced model is about three times cheaper, a comparison across two case sets of the same split.
+**Accuracy-runtime trade-off** (against the exact solution).
+
+*Controlled (same 10 cases, same interleaved run):* the N = 128 FOM costs 4.0 ms for 2.0e-3, a tensorial POD
+model built at N = 2048 with r = 8 and the P1 step costs 4.9 ms for 5.4e-4: about four times more accurate
+for 23% more time. Near 1e-6, the N = 512 FOM (29.7 ms, 1.4e-6) is *faster* than r = 16 tensorial POD at
+N = 2048 with explicit steps (49 ms, 6.3e-7), which is somewhat more accurate.
+
+*Indicative only (not a head-to-head benchmark):* with the implicit Radau policy the same r = 16 model took
+11.4 ms per trajectory in Section 11 (solver only, all 40 test cases, a different run and case set), and
+its time-integration error there (2e-9) implies the same 6.3e-7 accuracy. That suggests a factor of about
+2.5 over the N = 512 FOM at slightly better accuracy, but Radau was not timed in this benchmark, so the
+factor is not established.
 
 ## 12. Discussion
 
@@ -455,11 +463,12 @@ reduced diffusion is genuinely stiff and an implicit integrator pays off.
 8. **Can reduced-specific time stepping improve runtime?** Yes: the reduced CFL policy (P1) passed the
    pre-registered test everywhere and cut RHS evaluations up to 5.1x; Radau is fastest when the reduced
    diffusion is stiff. *Established for the tested (N, r).*
-9. **Best accuracy-runtime trade-off.** A tensorial POD model trained on a resolved grid (N = 2048) and
-   integrated with a reduced-specific step: r = 8 with the reduced CFL step is four times more accurate
-   than the N = 128 FOM at the same cost (about 5 ms, 5.4e-4 vs 2.0e-3 against the exact solution); r = 16
-   with Radau reaches 6.3e-7 in about 11 ms, against 30 ms for the N = 512 FOM at 1.4e-6. *Established on
-   this machine for the measured cases; the r = 16 comparison combines two case sets of the same split.*
+9. **Best accuracy-runtime trade-off.** At low cost, a tensorial POD model trained on a resolved grid
+   (N = 2048, r = 8, reduced CFL step) is about four times more accurate than the N = 128 FOM at similar
+   cost (4.9 vs 4.0 ms; 5.4e-4 vs 2.0e-3 against the exact solution). *Established on 10 test cases on this
+   machine.* Near 1e-6, explicit r = 16 tensorial POD is slower than the N = 512 FOM (49 vs 30 ms) at
+   slightly better accuracy; with Radau it would plausibly be about 2.5 times faster (11.4 ms in a separate
+   run on all 40 test cases). *Hypothesis: not measured head to head.*
 10. **Remaining limitations**: Section 13. Hypotheses not tested here: that a step rule based on the
     Jacobian's real parts (or an error-controlled IF-RK4) would combine P2's cost with P1's robustness;
     that the conclusions carry over to non-linearizable or multi-dimensional problems.
@@ -489,7 +498,7 @@ All accuracy results are deterministic; timings vary by a few percent.
 | | |
 |---|---|
 | ![](spatial_convergence/figures/fig01_spatial_convergence.png) 1. Spatial convergence and consecutive differences. | ![](spatial_convergence/figures/fig02_temporal_convergence.png) 2. Temporal convergence at fixed N (shaded: below the order floor). |
-| ![](spatial_convergence/figures/fig03_fourier_spectra.png) 3. Exact spectra and FOM spectra (test 5). | ![](spatial_convergence/figures/fig04_reference_verification.png) 4. Reference verification, all 51 cases. |
+| ![](spatial_convergence/figures/fig03_fourier_spectra.png) 3. Exact spectra and FOM spectra (test 5). | ![](spatial_convergence/figures/fig04_reference_verification.png) 4. Reference verification, all 48 distinct cases. |
 | ![](spatial_convergence/figures/fig05_error_vs_viscosity.png) 5. FOM error vs viscosity (40 test cases). | ![](spatial_convergence/figures/fig06_error_vs_amplitude.png) 6. FOM error vs amplitude. |
 | ![](spatial_convergence/figures/fig07_rom_error_vs_rank.png) 7. Tensorial POD error vs rank. | ![](spatial_convergence/figures/fig08_rom_error_vs_resolution.png) 8. ROM error vs resolution. |
 | ![](spatial_convergence/figures/fig09_projection_vs_trajectory_error.png) 9. Projection vs trajectory error (N = 2048). | ![](spatial_convergence/figures/fig10_energy_evolution.png) 10. Energy evolution. |
