@@ -1,0 +1,103 @@
+{
+ "ranks": {
+  "4": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 6.065530334556574e-13,
+   "rhs_rel_diff_max": 5.16832133997295e-15,
+   "rhs_rel_diff_median": 5.953877594098244e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 3.1099735603754675e-16,
+   "traj_rel_diff_median_float64_a0": 1.7800046711675752e-16,
+   "traj_rel_diff_max_original_float32_a0": 1.8149884474759382e-10,
+   "control_eps_perturbation_rel_diff_max": 4.2763038793257285e-16,
+   "step_counts_identical": true
+  },
+  "6": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 4.51755449593289e-12,
+   "rhs_rel_diff_max": 1.1219421209417655e-14,
+   "rhs_rel_diff_median": 7.76844340405896e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 2.888663144596148e-16,
+   "traj_rel_diff_median_float64_a0": 2.0816290996648646e-16,
+   "traj_rel_diff_max_original_float32_a0": 1.7465319085820633e-10,
+   "control_eps_perturbation_rel_diff_max": 3.4684134052574615e-16,
+   "step_counts_identical": true
+  },
+  "8": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 2.547612806059926e-12,
+   "rhs_rel_diff_max": 2.073283013920456e-14,
+   "rhs_rel_diff_median": 7.517473279272115e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 3.965909625068397e-16,
+   "traj_rel_diff_median_float64_a0": 1.8320344227342236e-16,
+   "traj_rel_diff_max_original_float32_a0": 1.979580136625123e-10,
+   "control_eps_perturbation_rel_diff_max": 2.6439397500455983e-16,
+   "step_counts_identical": true
+  },
+  "12": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 3.996315347648844e-12,
+   "rhs_rel_diff_max": 2.021484186220948e-14,
+   "rhs_rel_diff_median": 6.051627018122925e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 3.6422840042658866e-16,
+   "traj_rel_diff_median_float64_a0": 1.8136199582503754e-16,
+   "traj_rel_diff_max_original_float32_a0": 1.964355271112032e-10,
+   "control_eps_perturbation_rel_diff_max": 2.4741043410808007e-16,
+   "step_counts_identical": true
+  },
+  "16": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 5.383719994167673e-12,
+   "rhs_rel_diff_max": 3.688824995505085e-14,
+   "rhs_rel_diff_median": 5.84069575054008e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 2.7196727856847823e-16,
+   "traj_rel_diff_median_float64_a0": 1.7687249059233046e-16,
+   "traj_rel_diff_max_original_float32_a0": 2.591709796406506e-10,
+   "control_eps_perturbation_rel_diff_max": 2.3695545608389734e-16,
+   "step_counts_identical": true
+  }
+ },
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.13",
+  "numpy": "1.26.4",
+  "scipy": "1.13.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "8f486371d4e09eeaa06a5c27a8a2c9d611e8b6d3",
+  "git_dirty_paths": 4,
+  "loadavg_start": [
+   7.45654296875,
+   5.5732421875,
+   3.99267578125
+  ],
+  "top_cpu_processes_start": [
+   "45.8 fileproviderd",
+   " 40.8 .venv/bin/python",
+   " 22.7 bird",
+   "  7.9 nsurlsessiond",
+   "  4.3 cloudd"
+  ],
+  "power": "Now drawing from 'Battery Power'",
+  "torch": "2.15.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "cuda_available": false,
+  "loadavg_end": [
+   7.33984375,
+   5.580078125,
+   4.00439453125
+  ]
+ }
+}
