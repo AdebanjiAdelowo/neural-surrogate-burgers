@@ -38,10 +38,11 @@ from src.deim import deim_rom_predict
 from src.metrics import relative_l2
 from src.pod_rom import _burgers_rhs_physical, rom_predict, rom_reduced_trajectory
 from src.solver import solve_burgers
-from src.deim import collect_nonlinear_snapshots
-from src.spectral_deim import (build_basis, build_spectral_deim, nonlinear_snapshots,
+from src.deim import build_deim_projector, collect_nonlinear_snapshots
+from src.spectral_deim import (build_basis, build_spectral_deim, deim_rhs_fn,
+                               interpolation_conditioning, interpolation_pinv, nonlinear_snapshots,
                                sampled_diffusion, sampled_quadratic_tensor, select_points,
-                               spectral_deim_predict)
+                               spectral_deim_predict, spectral_deim_rhs)
 from src.tensorial_pod import (build_tensorial_rom, quadratic_rhs, tensorial_predict,
                                tensorial_reduced_trajectory, tensorial_rhs)
 
@@ -486,12 +487,141 @@ def stage_spectral_consistency(tag):
     save("spectral_consistency", tag, out)
 
 
+# =============================================================================== stage: deim_sweep
+M_LIST = (8, 12, 16, 24)
+
+
+def deim_configs(m_list=M_LIST, targets=("nonlinear", "full")):
+    """Every (target, m, s, selection) of the sweep: s = m with DEIM and Q-DEIM; s = ceil(1.5 m) and
+    2 m with the two oversampling rules."""
+    out = []
+    for target in targets:
+        for m in m_list:
+            for sel in ("deim", "qdeim"):
+                out.append((target, m, m, sel))
+            for s in (int(np.ceil(1.5 * m)), 2 * m):
+                for sel in ("qdeim+greedy", "qdeim_extended"):
+                    out.append((target, m, s, sel))
+    return out
+
+
+def config_name(target, m, s, sel):
+    return f"{target}|m={m}|s={s}|{sel}"
+
+
+def build_config(Phi, db, target, m, s, sel, k, dealias):
+    Psi_all = db[target][0]
+    Psi = Psi_all[:, :m]
+    pts = select_points(Psi, s=s, method=sel, Psi_extended=Psi_all)
+    return build_spectral_deim(Phi, Psi, pts, k, dealias, target=target), Psi
+
+
+def hybrid_models(Phi, data, m_list=M_LIST):
+    """{m: (M, points, Psi)} of src/deim.py's DEIM/local-FD model (full-RHS basis, greedy DEIM
+    points) by the historical recipe (scripts/hyperreduction_benchmark.build_bases); m = 16 is the
+    stored operator, so the canonical configuration is bit-identical to the historical one."""
+    _, tnu, tU = data["train"]
+    _, _, dm, _, _ = build_bases(tU, tnu, NX, r_max=8, m_list=m_list)
+    out = {m: (build_deim_projector(Phi, dm[m]["Psi"], dm[m]["points"]), dm[m]["points"], dm[m]["Psi"])
+           for m in m_list}
+    if 16 in out:
+        st = stored_basis()
+        out[16] = (st["M"], st["points"], st["Psi"])
+    return out
+
+
+def run_spectral(model, Phi, u0, nu):
+    with np.errstate(all="ignore"):
+        return spectral_deim_predict(u0, Phi, model, nu, T=T_FINAL, n_save=N_SAVE, align_snapshots=True)[1]
+
+
+def run_hybrid(M, pts, Phi, u0, nu, stencil_order=2):
+    with np.errstate(all="ignore"):
+        return deim_rom_predict(u0, Phi, M, pts, NX, nu=nu, T=T_FINAL, n_save=N_SAVE,
+                                stencil_order=stencil_order, align_snapshots=True)[1]
+
+
+def stage_deim_sweep(tag):
+    """All spectral-DEIM configurations at r = 8 (stored POD basis): conditioning, approximation
+    errors at the states the ROM visits, trajectory accuracy on val (selection) and test (report),
+    stability, energy, and RHS / end-to-end cost; plus the hybrid DEIM/local-FD at each m."""
+    env = environment_info()
+    data = load_data()
+    k, dealias = wavenumbers(NX)
+    Phi = stored_basis()["Phi"]
+    tens = build_tensorial_rom(Phi, k, dealias)
+    db = deim_bases(data=data)
+    sets = {s_: case_set(s_, data) for s_ in ("val", "test")}
+    # states visited: projections of the aligned reference snapshots of the test cases
+    states = [((Phi.T @ ref[j]).astype(np.float64), nu, ref[j].astype(np.float64))
+              for _, _, nu, ref in sets["test"] for j in range(N_SAVE)]
+    out = {"r": 8, "configs": {}, "hybrid_localfd": {}}
+    for cfg in deim_configs():
+        target, m, s, sel = cfg
+        t0 = time.perf_counter()
+        model, Psi = build_config(Phi, db, target, m, s, sel, k, dealias)
+        offline_s = time.perf_counter() - t0
+        interp = Psi @ interpolation_pinv(Psi, model.points)  # (Nx, s) full-field reconstruction
+        nl_err, rhs_err = [], []
+        for a, nu, uref in states:
+            # (i) DEIM interpolation error of the TRUE nonlinear quantity on the reference field
+            q = (_burgers_rhs_physical(uref, k, 0.0, dealias) if target == "nonlinear"
+                 else _burgers_rhs_physical(uref, k, nu, dealias))
+            nl_err.append(np.linalg.norm(interp @ q[model.points] - q) / np.linalg.norm(q))
+            # (ii) reduced RHS error against the exact Galerkin RHS at the same reduced state
+            ft = tensorial_rhs(tens, a, nu)
+            rhs_err.append(np.linalg.norm(spectral_deim_rhs(model, a, nu) - ft) / np.linalg.norm(ft))
+        entry = {"target": target, "m": m, "s": s, "selection": sel, "points": model.points,
+                 "conditioning": model.conditioning, "offline_s": offline_s,
+                 "diffusion_radius": model.diffusion_radius,
+                 "field_interp_rel_err": stats(nl_err), "reduced_rhs_rel_err": stats(rhs_err),
+                 "bytes_online": int(model.M.nbytes + model.C.nbytes + model.Lin.nbytes)}
+        for split, cases in sets.items():
+            rows = [{"case": lab, "nu": nu, **physical_diagnostics(run_spectral(model, Phi, u0, nu), ref)}
+                    for lab, u0, nu, ref in cases]
+            entry[split] = {"summary": summarize(rows), "rows": rows}
+        rhs = deim_rhs_fn(model, float(sets["test"][0][2]))
+        entry["rhs_us"] = _med_us(lambda: rhs(states[5][0]))
+        tm = [np.median(interleaved_timing({"x": lambda: run_spectral(model, Phi, u0, nu)}, reps=5,
+                                           warmup=1)["x"]) for _, u0, nu, _ in sets["test"][::4]]
+        entry["end_to_end_ms_mean_10cases"] = 1e3 * float(np.mean(tm))
+        out["configs"][config_name(*cfg)] = entry
+        sv, stt = entry["val"]["summary"], entry["test"]["summary"]
+        print(f"{config_name(*cfg):34s} cond {model.conditioning['cond']:7.2f} | rhs err med "
+              f"{entry['reduced_rhs_rel_err']['median']:.1e} | val {100*sv['mean']:.4f}% test {100*stt['mean']:.4f}%"
+              f" (max {100*stt['max']:.3f}%, unstable {stt['n_unstable']}) | {entry['rhs_us']:.2f} us")
+    # ---- hybrid DEIM/local-FD at the same m (s = m, greedy DEIM, full-RHS basis)
+    for m, (M, pts, Psi_h) in hybrid_models(Phi, data).items():
+        entry = {"m": m, "points": pts, "conditioning": interpolation_conditioning(Psi_h, pts)}
+        for split, cases in sets.items():
+            rows = [{"case": lab, "nu": nu, **physical_diagnostics(run_hybrid(M, pts, Phi, u0, nu), ref)}
+                    for lab, u0, nu, ref in cases]
+            entry[split] = {"summary": summarize(rows), "rows": rows}
+        out["hybrid_localfd"][str(m)] = entry
+        stt = entry["test"]["summary"]
+        print(f"hybrid local-FD m={m:2d} val {100*entry['val']['summary']['mean']:.4f}% test {100*stt['mean']:.4f}%"
+              f" (max {100*stt['max']:.3f}%, unstable {stt['n_unstable']}, >10% {stt['n_above_10pct']})")
+    # ---- selection on val only (lowest mean val error among configurations stable on all val cases)
+    ok = {n: e for n, e in out["configs"].items() if e["val"]["summary"]["n_unstable"] == 0}
+    for target in ("nonlinear", "full"):
+        cand = {n: e for n, e in ok.items() if e["target"] == target}
+        best = min(cand, key=lambda n: cand[n]["val"]["summary"]["mean"])
+        out[f"best_on_val_{target}"] = best
+        print(f"best on val ({target}): {best} -> test {100*cand[best]['test']['summary']['mean']:.4f}%")
+    out["tensorial_test_mean"] = summarize([{"rel_l2": relative_l2(
+        tensorial_predict(u0, Phi, tens, nu, T=T_FINAL, n_save=N_SAVE, align_snapshots=True)[1], ref),
+        "stable": True} for _, u0, nu, ref in sets["test"]])["mean"]
+    out["env"] = finish_env(env)
+    save("deim_sweep", tag, out)
+
+
 def _med_us(fn, number=2000, repeat=9):
     return 1e6 * float(np.median(timeit.repeat(fn, number=number, repeat=repeat))) / number
 
 
 STAGES = {"baseline": stage_baseline, "equivalence": stage_equivalence,
-          "tensorial_bench": stage_tensorial_bench, "spectral_consistency": stage_spectral_consistency}
+          "tensorial_bench": stage_tensorial_bench, "spectral_consistency": stage_spectral_consistency,
+          "deim_sweep": stage_deim_sweep}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
