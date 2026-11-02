@@ -34,17 +34,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.generate_dataset import N_SAVE, NX, T_FINAL
 from scripts.hyperreduction_benchmark import (build_bases, environment_info, err_stats, finish_env,
                                                interleaved_timing, load_data, stats, wavenumbers)
-from src.deim import deim_rom_predict
+from src.deim import (_stencil_support, build_deim_projector, collect_nonlinear_snapshots,
+                      deim_rom_predict, deim_rom_reduced_trajectory)
+from src.energy_conserving import (energy_conserving_tensor, energy_production,
+                                   energy_production_ratio, fold_hybrid_localfd, max_symmetric_eig,
+                                   quadratic_model, weighted_energy_conserving_tensor)
 from src.metrics import relative_l2
 from src.pod_rom import _burgers_rhs_physical, rom_predict, rom_reduced_trajectory
 from src.solver import solve_burgers
-from src.deim import build_deim_projector, collect_nonlinear_snapshots
-from src.spectral_deim import (build_basis, build_spectral_deim, deim_rhs_fn,
+from src.spectral_deim import (build_basis, build_spectral_deim, deim_rhs_fn, folded_tensor,
                                interpolation_conditioning, interpolation_pinv, nonlinear_snapshots,
                                sampled_diffusion, sampled_quadratic_tensor, select_points,
-                               spectral_deim_predict, spectral_deim_rhs)
-from src.tensorial_pod import (build_tensorial_rom, quadratic_rhs, tensorial_predict,
-                               tensorial_reduced_trajectory, tensorial_rhs)
+                               spectral_deim_predict, spectral_deim_reduced_trajectory,
+                               spectral_deim_rhs)
+from src.tensorial_pod import (build_tensorial_rom, quadratic_jacobian, quadratic_rhs,
+                               reduced_step_count, tensorial_predict, tensorial_reduced_trajectory,
+                               tensorial_rhs)
+from src.timestep import rk4_max_stable_dt
 
 OUT_DIR = "report/tensorial_deim"
 L = 2 * np.pi
@@ -615,13 +621,181 @@ def stage_deim_sweep(tag):
     save("deim_sweep", tag, out)
 
 
+# ================================================================================ stage: stability
+def quadratic_family(Phi, data, k, dealias):
+    """Every r = 8 model of the stability study written as a quadratic model (Q, K) (see
+    src/energy_conserving.py), with its provenance. Hybrid = the stored m = 16 local-FD operator;
+    "spec_full_same_pts" uses the SAME Psi and points as the hybrid, so hybrid vs spec_full_same_pts
+    isolates the local-FD sampling error with the interpolation held fixed."""
+    st = stored_basis()
+    tens = build_tensorial_rom(Phi, k, dealias)
+    db = deim_bases(data=data)
+    fam = {"tensorial": (tens.Q, tens.L)}
+    Qh, Kh = fold_hybrid_localfd(Phi, st["M"], st["points"], NX)
+    fam["hybrid_localfd"] = (Qh, Kh)
+    same = build_spectral_deim(Phi, st["Psi"], st["points"], k, dealias, target="full")
+    fam["spec_full_same_pts"] = (folded_tensor(same), same.Lin)
+    for cfg in (("nonlinear", 16, 16, "qdeim"), ("nonlinear", 8, 12, "qdeim_extended"),
+                ("full", 12, 24, "qdeim_extended")):
+        mdl, _ = build_config(Phi, db, *cfg, k, dealias)
+        fam["spec_" + config_name(*cfg)] = (folded_tensor(mdl), mdl.Lin)
+    # sigma_i = RMS of the i-th POD coordinate over the TRAINING snapshots (no val/test information)
+    _, _, tU = data["train"]
+    sigma = np.sqrt(np.mean((tU.reshape(-1, NX).astype(np.float64) @ Phi) ** 2, axis=0))
+    for name in ("tensorial", "hybrid_localfd", "spec_full_same_pts"):
+        Q, K = fam[name]
+        fam["EC_" + name] = (energy_conserving_tensor(Q), K)
+        fam["WEC_" + name] = (weighted_energy_conserving_tensor(Q, sigma), K)
+    return fam
+
+
+def run_quadratic(Q, K, a0, u0max, nu, dt=None):
+    model = quadratic_model(Q, K, NX)
+    with np.errstate(all="ignore"):
+        _, a, n = tensorial_reduced_trajectory(a0, u0max, model, nu, T_FINAL, N_SAVE, dt=dt,
+                                               align_snapshots=True)
+    return a, n, model
+
+
+def stage_stability(tag, perturb=1e-7):
+    env = environment_info()
+    data = load_data()
+    k, dealias = wavenumbers(NX)
+    st = stored_basis()
+    Phi = st["Phi"]
+    fam = quadratic_family(Phi, data, k, dealias)
+    sA, snu, sU = data["test"]
+    refs = {lab: ref for lab, _, _, ref in case_set("test", data)}
+    base = json.load(open(os.path.join(OUT_DIR, "baseline_run1.json")))
+    hyb_err = np.array(base["reproduced"]["aligned_test_deim_localfd_per_case"])
+    bad = [int(i) for i in np.where(hyb_err > 0.10)[0]]
+    controls = [int(np.argsort(sA / snu)[r_]) for r_ in (0, 10, 20, 30, 39)]  # a-priori, by A/nu rank
+    controls = [c for c in controls if c not in bad]  # ranks 30 and 39 are already bad cases
+    out = {"bad_cases_hybrid_gt_10pct": bad, "control_cases_by_A_over_nu_rank": controls,
+           "models": list(fam), "global": {}, "cases": {}}
+
+    # ---- global structure of each model
+    for name, (Q, K) in fam.items():
+        out["global"][name] = {"sym_Q_ratio": energy_production_ratio(Q),
+                               "max_eig_sym_K": max_symmetric_eig(K),
+                               "max_re_eig_K": float(np.linalg.eigvals(K).real.max()),
+                               "rho_K": float(np.abs(np.linalg.eigvals(K)).max())}
+    print({n: f"Sym/Q {g['sym_Q_ratio']:.1e} symK {g['max_eig_sym_K']:.2e}" for n, g in out["global"].items()})
+
+    # ---- full-order discrete energy balance along the reference trajectories (all 40 test cases)
+    dx = L / NX
+    fom_bal = []
+    for lab, ref in refs.items():
+        nu = float(snu[int(lab[4:])])
+        rows = []
+        for u in ref.astype(np.float64)[1:]:
+            p_nl = dx * u @ _burgers_rhs_physical(u, k, 0.0, dealias)
+            p_v = nu * dx * u @ np.real(np.fft.ifft(-(k**2) * np.fft.fft(u)))
+            rows.append(abs(p_nl) / abs(p_v))
+        fom_bal.append(max(rows))
+    out["fom_energy_balance"] = {"definition": "max over saved snapshots of |dx u^T N(u)| / |nu dx u^T D2 u| "
+                                               "(aliasing energy production relative to viscous dissipation)",
+                                 "per_case": fom_bal, "max": max(fom_bal), "median": float(np.median(fom_bal))}
+    print(f"FOM aliasing energy production / dissipation: median {np.median(fom_bal):.1e}, max {max(fom_bal):.1e}")
+
+    # ---- per-case diagnostics on the bad and control cases
+    support, neigh = _stencil_support(st["points"], NX, 1)
+    for i in bad + controls:
+        A, nu, u0 = float(sA[i]), float(snu[i]), sU[i, 0]
+        ref = refs[f"test{i}"].astype(np.float64)
+        a0, u0max = (Phi.T @ u0).astype(np.float64), float(np.abs(u0).max())
+        proj = ref @ Phi @ Phi.T
+        a_ref = ref @ Phi                                       # projected reference states
+        case = {"A": A, "nu": nu, "A_over_nu": A / nu, "kind": "bad" if i in bad else "control",
+                "pod_projection_err": relative_l2(proj.astype(np.float32), ref.astype(np.float32)),
+                "models": {}}
+        # FD sampling error at the DEIM points along the reference (true field, not projected)
+        dxx = L / NX
+        fd_err = []
+        for u in ref[1:]:
+            ul, uc, ur = u[neigh[:, 0]], u[neigh[:, 1]], u[neigh[:, 2]]
+            f_fd = -uc * (ur - ul) / (2 * dxx) + nu * (ur - 2 * uc + ul) / dxx**2
+            f_sp = _burgers_rhs_physical(u, k, nu, dealias)[st["points"]]
+            fd_err.append(np.linalg.norm(f_fd - f_sp) / np.linalg.norm(f_sp))
+        case["localfd_sample_rel_err_on_true_field"] = {"max": float(max(fd_err)), "median": float(np.median(fd_err))}
+        ref_grad = np.abs(np.real(np.fft.ifft(1j * k * np.fft.fft(ref, axis=1), axis=1))).max()
+        case["ref_max_abs_ux"] = float(ref_grad)
+        Qt = fam["tensorial"][0]
+        for name, (Q, K) in fam.items():
+            a, n, model = run_quadratic(Q, K, a0, u0max, nu)
+            dt = T_FINAL / n
+            u = a @ Phi.T
+            diag = physical_diagnostics(u, ref)
+            a4, _, _ = run_quadratic(Q, K, a0, u0max, nu, dt=dt / 4 * (1 + 1e-9))
+            e4 = relative_l2((a4 @ Phi.T).astype(np.float32), ref.astype(np.float32))
+            # Jacobian spectra along the projected reference trajectory (the states the exact
+            # dynamics visit) and along the model's own trajectory
+            def jac_stats(states):
+                re, om, dts = [], [], []
+                for s_ in states:
+                    J = quadratic_jacobian(Q, nu * K, s_)
+                    ev = np.linalg.eigvals(J)
+                    re.append(float(ev.real.max()))
+                    om.append(float(np.linalg.eigvalsh(0.5 * (J + J.T)).max()))
+                    dts.append(rk4_max_stable_dt(ev, dt_max=1.0))
+                return {"max_re_eig": max(re), "max_re_eig_per_snapshot": re,
+                        "max_numerical_abscissa": max(om),
+                        "min_frozen_rk4_dt": float(min(dts)), "dt_used": dt}
+            fin = np.all(np.isfinite(a), axis=1)
+            jac_ref = jac_stats(a_ref)
+            jac_own = jac_stats(a[fin]) if fin.any() else None
+            # perturbation growth of the model's own dynamics
+            d = np.random.default_rng(i).standard_normal(8)
+            d *= perturb * np.linalg.norm(a0) / np.linalg.norm(d)
+            ap, _, _ = run_quadratic(Q, K, a0 + d, u0max, nu, dt=dt * (1 + 1e-12))
+            growth = np.linalg.norm(ap - a, axis=1) / np.linalg.norm(d)
+            # energy budget along the projected reference: nonlinear production vs viscous dissipation
+            prod = [energy_production(Q, s_) for s_ in a_ref[1:]]
+            diss = [nu * s_ @ K @ s_ for s_ in a_ref[1:]]
+            f_q, f_t = quadratic_rhs(Q.reshape(64, 8), nu * K), quadratic_rhs(Qt.reshape(64, 8), nu * fam["tensorial"][1])
+            rhs_err = [np.linalg.norm(f_q(s_) - f_t(s_)) / np.linalg.norm(f_t(s_)) for s_ in a_ref]
+            case["models"][name] = {
+                **{k_: diag[k_] for k_ in ("rel_l2", "stable", "energy_spurious_growth", "energy_final_ratio",
+                                           "max_grad_ratio_final") if k_ in diag},
+                "n_steps": n, "rel_l2_dt_over_4": e4, "jacobian_on_projected_reference": jac_ref,
+                "jacobian_on_own_trajectory": jac_own,
+                "perturbation_growth_max": float(np.nanmax(growth)) if np.isfinite(growth).any() else float("inf"),
+                "perturbation_growth_final": float(growth[-1]),
+                "energy_production_over_dissipation_max": float(max(abs(p) / abs(q) for p, q in zip(prod, diss))),
+                "energy_production_max_positive": float(max(prod)),
+                "reduced_rhs_rel_err_vs_exact_median": float(np.median(rhs_err)),
+                "reduced_rhs_rel_err_vs_exact_max": float(max(rhs_err))}
+        out["cases"][str(i)] = case
+        mm = case["models"]
+        print(f"case {i:2d} ({case['kind']:7s}) A/nu {A/nu:6.1f} proj {100*case['pod_projection_err']:.3f}% | "
+              + " | ".join(f"{n[:18]} {100*mm[n]['rel_l2']:.3f}% re {mm[n]['jacobian_on_projected_reference']['max_re_eig']:+.1f}"
+                           for n in ("tensorial", "spec_full_same_pts", "hybrid_localfd", "WEC_hybrid_localfd")))
+
+    # ---- energy-conserving variants and their uncorrected counterparts on all val and test cases
+    out["ec_accuracy"] = {}
+    for split in ("val", "test"):
+        cases = case_set(split, data)
+        out["ec_accuracy"][split] = {}
+        for name in fam:
+            Q, K = fam[name]
+            rows = []
+            for lab, u0, nu, ref in cases:
+                a, _, _ = run_quadratic(Q, K, (Phi.T @ u0).astype(np.float64), float(np.abs(u0).max()), nu)
+                rows.append({"case": lab, "nu": nu, **physical_diagnostics(a @ Phi.T, ref)})
+            out["ec_accuracy"][split][name] = {"summary": summarize(rows), "rows": rows}
+        print(split, {n: f"{100*v['summary']['mean']:.4f}%/{v['summary']['n_above_10pct']}"
+                      for n, v in out["ec_accuracy"][split].items()})
+    out["env"] = finish_env(env)
+    save("stability", tag, out)
+
+
 def _med_us(fn, number=2000, repeat=9):
     return 1e6 * float(np.median(timeit.repeat(fn, number=number, repeat=repeat))) / number
 
 
 STAGES = {"baseline": stage_baseline, "equivalence": stage_equivalence,
           "tensorial_bench": stage_tensorial_bench, "spectral_consistency": stage_spectral_consistency,
-          "deim_sweep": stage_deim_sweep}
+          "deim_sweep": stage_deim_sweep, "stability": stage_stability}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
