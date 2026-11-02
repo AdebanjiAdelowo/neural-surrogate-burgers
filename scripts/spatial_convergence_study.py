@@ -114,7 +114,7 @@ def stage_spatial(tag, n_list=(64, 128, 256, 512, 1024, 2048, 4096, 8192),
 
 
 # ================================================================================== stage: temporal
-FLOOR = 1e-12  # errors below this are treated as at the float64 / reference floor (no order computed)
+FLOOR = 1e-11  # 10x the round-off plateau observed at N >= 1024 (about 1e-12, temporal_run1.json): no order below it
 
 
 def stage_temporal(tag, names=("corner_lowA_highnu", "centre", "corner_highA_highnu", "corner_lowA_lownu",
@@ -250,10 +250,17 @@ R_LIST = (4, 8, 12, 16, 24, 32)
 
 
 def training_ensemble(N, data=None):
-    """FOM (float64, baseline step rule, aligned) at N for the 200 historical training parameters."""
+    """FOM (float64, baseline step rule, aligned) at N for the 200 historical training parameters.
+    Cached in data/convergence_train_N<N>.npz (gitignored, regenerated deterministically if absent)."""
     data = data or load_data()
     trA, trnu, _ = data["train"]
+    path = f"data/convergence_train_N{N}.npz"
+    if os.path.exists(path):
+        st = np.load(path)
+        if np.array_equal(st["A"], trA) and np.array_equal(st["nu"], trnu):
+            return st["U"], trnu
     U = np.stack([solve_burgers_f64(sine_ic(float(a), N), float(v))[1] for a, v in zip(trA, trnu)])
+    np.savez(path, A=trA, nu=trnu, U=U)
     return U, trnu
 
 
@@ -356,8 +363,155 @@ def stage_rom(tag, n_list=(128, 256, 512, 1024, 2048), r_list=R_LIST):
     save("rom", tag, out)
 
 
+# ================================================================================== stage: timestep
+POLICIES = ("P0_reduced", "P1_reduced_cfl", "P2_if_rk4", "P3_rk45", "P4_radau")
+ADAPTIVE_TOL = {"rtol": 1e-6, "atol": 1e-9}  # fixed before the runs (plan, Section 3)
+
+
+def run_policy(policy, model, Phi, u0, nu, mult=1, tol=None):
+    """(a_save (20, r), info) of one reduced-integration policy; `mult` multiplies the step SIZE of the
+    fixed-step policies (work-precision sweep), `tol` overrides the adaptive tolerances."""
+    from src.reduced_timestep import (aligned_steps, if_rk4_dt, if_rk4_trajectory, reduced_cfl_dt,
+                                      rk4_trajectory, scipy_trajectory)
+    from src.tensorial_pod import reduced_step_count
+    a0, mx, rho = Phi.T @ u0, float(np.abs(u0).max()), model.diffusion_radius
+    with np.errstate(all="ignore"):
+        if policy == "P0_reduced":
+            n0 = reduced_step_count(mx, model.Nx, nu, T_FINAL, N_SAVE, align_snapshots=True,
+                                    diffusion_radius=rho)[0]
+            n = aligned_steps(T_FINAL / n0 * mult, T_FINAL, N_SAVE, min_steps=1)
+            return rk4_trajectory(model, a0, nu, T_FINAL, N_SAVE, n)[1], {"n_steps": n, "rhs_evals": 4 * n}
+        if policy == "P1_reduced_cfl":
+            n = aligned_steps(reduced_cfl_dt(mx, nu, rho) * mult, T_FINAL, N_SAVE, min_steps=1)
+            return rk4_trajectory(model, a0, nu, T_FINAL, N_SAVE, n)[1], {"n_steps": n, "rhs_evals": 4 * n}
+        if policy == "P2_if_rk4":
+            n = aligned_steps(if_rk4_dt(mx, rho) * mult, T_FINAL, N_SAVE, min_steps=1)
+            return if_rk4_trajectory(model, a0, nu, T_FINAL, N_SAVE, n)[1], {"n_steps": n, "rhs_evals": 4 * n}
+        method = {"P3_rk45": "RK45", "P4_radau": "Radau", "DOP853": "DOP853"}[policy]
+        t = tol or ADAPTIVE_TOL
+        a, info = scipy_trajectory(model, a0, nu, TIMES, method, t["rtol"], t["atol"])
+        info["rhs_evals"] = info["nfev"]
+        return a, info
+
+
+def stage_timestep(tag, n_list=(128, 512, 2048), r_list=(8, 16), reps=5):
+    from scripts.hyperreduction_benchmark import interleaved_timing, wavenumbers
+    from src.pod_rom import build_pod_basis
+    from src.reduced_timestep import advective_rate_bound, count_steps, rk4_trajectory
+    from src.tensorial_pod import build_tensorial_rom, quadratic_jacobian, reduced_step_count
+    from src.timestep import fom_advective_dt, rk4_max_stable_dt
+    env = environment_info()
+    data = load_data()
+    out = {"policies": POLICIES, "adaptive_tol": ADAPTIVE_TOL, "by_N_r": {}}
+    for N in n_list:
+        U, _ = training_ensemble(N, data)
+        Phi_all, _ = build_pod_basis(U.reshape(-1, N), max(r_list))
+        k, dealias = wavenumbers(N)
+        for r in r_list:
+            Phi = np.ascontiguousarray(Phi_all[:, :r])
+            model = build_tensorial_rom(Phi, k, dealias)
+            rho = model.diffusion_radius
+            key = f"N{N}_r{r}"
+            rec = {"N": N, "r": r, "rho_L": rho, "sqrt_rho_L": float(np.sqrt(rho)), "splits": {}}
+            for split in ("val", "test"):
+                sA, snu, _ = data[split]
+                rows = []
+                for i in range(len(sA)):
+                    A, nu = float(sA[i]), float(snu[i])
+                    u0 = sine_ic(A, N)
+                    fom = solve_burgers_f64(u0, nu)[1]
+                    n0 = reduced_step_count(A, N, nu, T_FINAL, N_SAVE, align_snapshots=True, diffusion_radius=rho)[0]
+                    conv = rk4_trajectory(model, Phi.T @ u0, nu, T_FINAL, N_SAVE, 16 * n0)[1]  # time-converged ROM
+                    row = {"i": i, "A": A, "nu": nu, "fom_steps": default_step_count(A, N),
+                           "fom_dt": fom_advective_dt(A, N), "policies": {}}
+                    if split == "val":  # Part A: Jacobian analysis along the projected FOM trajectory
+                        ratios, dts, re_max = [], [], []
+                        for s_ in fom[1:]:
+                            a = Phi.T @ s_
+                            Jn = quadratic_jacobian(model.Q, 0 * model.L, a)
+                            ratios.append(np.linalg.norm(Jn, 2) / advective_rate_bound(np.abs(Phi @ a).max(), rho))
+                            ev = np.linalg.eigvals(Jn + nu * model.L)
+                            re_max.append(float(ev.real.max()))
+                            dts.append(rk4_max_stable_dt(ev, dt_max=1.0))
+                        row["jacobian"] = {"norm_over_bound_max": float(max(ratios)), "max_re_eig": float(max(re_max)),
+                                           "frozen_rk4_dt_min": float(min(dts))}
+                    for pol in POLICIES:
+                        a, info = run_policy(pol, model, Phi, u0, nu)
+                        rom = a @ Phi.T
+                        fin = bool(np.all(np.isfinite(rom)))
+                        row["policies"][pol] = {
+                            **{k_: v for k_, v in info.items() if k_ != "message"},
+                            "stable": fin and float(np.abs(rom).max()) <= 10 * float(np.abs(u0).max()),
+                            "time_err": float(np.linalg.norm(a - conv) / np.linalg.norm(conv)) if fin else float("inf"),
+                            "rom_vs_fom": rel_l2(rom, fom) if fin else float("inf")}
+                    for meth in ("RK45",):
+                        row["policies"]["P3_rk45"]["steps"] = count_steps(model, Phi.T @ u0, nu, T_FINAL, meth,
+                                                                          **ADAPTIVE_TOL)
+                    if split == "test" or i % 4 == 0:  # runtime: all test cases, every 4th val case
+                        t = interleaved_timing({p: (lambda p=p: run_policy(p, model, Phi, u0, nu)) for p in POLICIES},
+                                               reps=reps, warmup=1)
+                        for p in POLICIES:
+                            row["policies"][p]["solve_ms"] = 1e3 * float(np.median(t[p]))
+                    rows.append(row)
+                # pre-registered acceptance: stable everywhere and e_fom <= 1.05 e_fom(P0) + 1e-6 per case
+                acc = {}
+                for pol in POLICIES:
+                    ok = [x["policies"][pol]["stable"] and x["policies"][pol]["rom_vs_fom"] <=
+                          1.05 * x["policies"]["P0_reduced"]["rom_vs_fom"] + 1e-6 for x in rows]
+                    g = lambda key: [x["policies"][pol][key] for x in rows if key in x["policies"][pol]]
+                    acc[pol] = {"accepted": bool(all(ok)), "n_fail": int(len(ok) - sum(ok)),
+                                "steps_mean": float(np.mean(g("n_steps"))) if g("n_steps") else None,
+                                "rhs_evals_mean": float(np.mean(g("rhs_evals"))),
+                                "time_err_max": float(np.max(g("time_err"))),
+                                "rom_vs_fom_mean": float(np.mean(g("rom_vs_fom"))),
+                                "solve_ms_mean": float(np.mean(g("solve_ms"))) if g("solve_ms") else None}
+                acc["fom_steps_mean"] = float(np.mean([x["fom_steps"] for x in rows]))
+                rec["splits"][split] = {"summary": acc, "rows": rows}
+                print(f"{key} {split}: fom steps {acc['fom_steps_mean']:.0f} | " + " | ".join(
+                    f"{p.split('_')[0]} {'OK' if acc[p]['accepted'] else 'FAIL'} ev {acc[p]['rhs_evals_mean']:.0f} "
+                    f"terr {acc[p]['time_err_max']:.0e} ms {acc[p]['solve_ms_mean'] or float('nan'):.2f}" for p in POLICIES))
+            vr = rec["splits"]["val"]["rows"]
+            rec["jacobian_summary_val"] = {k_: (float(max(x["jacobian"][k_] for x in vr)) if k_ != "frozen_rk4_dt_min"
+                                                else float(min(x["jacobian"][k_] for x in vr)))
+                                           for k_ in ("norm_over_bound_max", "max_re_eig", "frozen_rk4_dt_min")}
+            # Part C: work-precision on the validation cases (time error vs RHS evaluations / runtime)
+            wp = {}
+            for pol, mults in (("P0_reduced", (1, 2, 4, 8)), ("P1_reduced_cfl", (0.5, 1, 2, 4)),
+                               ("P2_if_rk4", (0.5, 1, 2, 4))):
+                for m in mults:
+                    errs, evals = [], []
+                    for x in vr[::4]:
+                        u0 = sine_ic(x["A"], N)
+                        n0 = reduced_step_count(x["A"], N, x["nu"], T_FINAL, N_SAVE, align_snapshots=True,
+                                                diffusion_radius=rho)[0]
+                        conv = rk4_trajectory(model, Phi.T @ u0, x["nu"], T_FINAL, N_SAVE, 16 * n0)[1]
+                        a, info = run_policy(pol, model, Phi, u0, x["nu"], mult=m)
+                        errs.append(float(np.linalg.norm(a - conv) / np.linalg.norm(conv)) if np.all(np.isfinite(a)) else float("inf"))
+                        evals.append(info["rhs_evals"])
+                    wp[f"{pol}_x{m}"] = {"time_err_max": float(max(errs)), "rhs_evals_mean": float(np.mean(evals))}
+            for pol in ("P3_rk45", "DOP853"):
+                for rt in (1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8):
+                    errs, evals = [], []
+                    for x in vr[::4]:
+                        u0 = sine_ic(x["A"], N)
+                        n0 = reduced_step_count(x["A"], N, x["nu"], T_FINAL, N_SAVE, align_snapshots=True,
+                                                diffusion_radius=rho)[0]
+                        conv = rk4_trajectory(model, Phi.T @ u0, x["nu"], T_FINAL, N_SAVE, 16 * n0)[1]
+                        a, info = run_policy(pol, model, Phi, u0, x["nu"], tol={"rtol": rt, "atol": rt * 1e-3})
+                        errs.append(float(np.linalg.norm(a - conv) / np.linalg.norm(conv)))
+                        evals.append(info["rhs_evals"])
+                    wp[f"{pol}_rtol{rt:g}"] = {"time_err_max": float(max(errs)), "rhs_evals_mean": float(np.mean(evals))}
+            rec["work_precision_val"] = wp
+            out["by_N_r"][key] = rec
+            print(f"{key}: rho(L) {rho:.0f} | Jacobian norm/bound max {rec['jacobian_summary_val']['norm_over_bound_max']:.2f}"
+                  f" max Re eig {rec['jacobian_summary_val']['max_re_eig']:+.2f} frozen RK4 dt min "
+                  f"{rec['jacobian_summary_val']['frozen_rk4_dt_min']:.2e}")
+    out["env"] = finish_env(env)
+    save("timestep", tag, out)
+
+
 STAGES = {"spatial": stage_spatial, "temporal": stage_temporal, "reference": stage_reference,
-          "diagnostics": stage_diagnostics, "rom": stage_rom}
+          "diagnostics": stage_diagnostics, "rom": stage_rom, "timestep": stage_timestep}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
