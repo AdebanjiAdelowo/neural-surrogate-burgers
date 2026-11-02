@@ -1,0 +1,470 @@
+{
+ "runs": [
+  "ctrl_run1",
+  "ctrl_run2"
+ ],
+ "variability": {
+  "fom_N128": {
+   "median_ms_per_run": [
+    3.904521,
+    4.5502085
+   ],
+   "max_rel_diff": 0.16536919637517644,
+   "within_case_rel_iqr_median": [
+    0.5672191217342544,
+    0.4772872531655627
+   ]
+  },
+  "fom_N256": {
+   "median_ms_per_run": [
+    10.437708500000001,
+    11.483187000000001
+   ],
+   "max_rel_diff": 0.10016360391746892,
+   "within_case_rel_iqr_median": [
+    0.3194161114458859,
+    0.2796293641534677
+   ]
+  },
+  "fom_N512": {
+   "median_ms_per_run": [
+    29.6412915,
+    30.550042000000005
+   ],
+   "max_rel_diff": 0.0306582626468892,
+   "within_case_rel_iqr_median": [
+    0.12493850508160043,
+    0.1346171008698924
+   ]
+  },
+  "fom_N1024": {
+   "median_ms_per_run": [
+    102.6575,
+    93.8812915
+   ],
+   "max_rel_diff": 0.09348197452098317,
+   "within_case_rel_iqr_median": [
+    0.07955705513216307,
+    0.08372191093875173
+   ]
+  },
+  "rom_r8_P1": {
+   "median_ms_per_run": [
+    5.172459,
+    4.430583500000001
+   ],
+   "max_rel_diff": 0.16744419781277098,
+   "within_case_rel_iqr_median": [
+    0.4778313048873608,
+    0.4784932577946922
+   ]
+  },
+  "rom_r16_P1": {
+   "median_ms_per_run": [
+    44.748896,
+    43.453688
+   ],
+   "max_rel_diff": 0.029806629991912414,
+   "within_case_rel_iqr_median": [
+    0.10277700980370416,
+    0.09584123354572442
+   ]
+  },
+  "rom_r16_radau": {
+   "median_ms_per_run": [
+    18.362479500000003,
+    17.419916
+   ],
+   "max_rel_diff": 0.05410838376028915,
+   "within_case_rel_iqr_median": [
+    0.27261308535959555,
+    0.17730794968860036
+   ]
+  },
+  "rom_r32_radau": {
+   "median_ms_per_run": [
+    23.844396000000003,
+    20.4550625
+   ],
+   "max_rel_diff": 0.16569656044805559,
+   "within_case_rel_iqr_median": [
+    0.3802061733559976,
+    0.28760940101285953
+   ]
+  }
+ },
+ "targets": {
+  "0.05": {
+   "cheapest_per_run": {
+    "ctrl_run1": "fom_N128",
+    "ctrl_run2": "rom_r8_P1"
+   },
+   "cheapest_fom": "fom_N128",
+   "methods_meeting": [
+    "fom_N128",
+    "fom_N256",
+    "fom_N512",
+    "fom_N1024",
+    "rom_r8_P1",
+    "rom_r16_P1",
+    "rom_r16_radau",
+    "rom_r32_radau"
+   ]
+  },
+  "0.01": {
+   "cheapest_per_run": {
+    "ctrl_run1": "rom_r8_P1",
+    "ctrl_run2": "rom_r8_P1"
+   },
+   "cheapest_fom": "fom_N512",
+   "methods_meeting": [
+    "fom_N512",
+    "fom_N1024",
+    "rom_r8_P1",
+    "rom_r16_P1",
+    "rom_r16_radau",
+    "rom_r32_radau"
+   ],
+   "fom_over_cheapest_time_per_run": [
+    5.7305996045594565,
+    6.895263795389479
+   ]
+  },
+  "0.002": {
+   "cheapest_per_run": {
+    "ctrl_run1": "rom_r8_P1",
+    "ctrl_run2": "rom_r8_P1"
+   },
+   "cheapest_fom": "fom_N512",
+   "methods_meeting": [
+    "fom_N512",
+    "fom_N1024",
+    "rom_r8_P1",
+    "rom_r16_P1",
+    "rom_r16_radau",
+    "rom_r32_radau"
+   ],
+   "fom_over_cheapest_time_per_run": [
+    5.7305996045594565,
+    6.895263795389479
+   ]
+  },
+  "0.001": {
+   "cheapest_per_run": {
+    "ctrl_run1": "rom_r16_radau",
+    "ctrl_run2": "rom_r16_radau"
+   },
+   "cheapest_fom": "fom_N512",
+   "methods_meeting": [
+    "fom_N512",
+    "fom_N1024",
+    "rom_r16_P1",
+    "rom_r16_radau",
+    "rom_r32_radau"
+   ],
+   "fom_over_cheapest_time_per_run": [
+    1.6142314277328396,
+    1.7537422109268497
+   ]
+  },
+  "1e-05": {
+   "cheapest_per_run": {
+    "ctrl_run1": "rom_r16_radau",
+    "ctrl_run2": "rom_r16_radau"
+   },
+   "cheapest_fom": "fom_N1024",
+   "methods_meeting": [
+    "fom_N1024",
+    "rom_r16_P1",
+    "rom_r16_radau",
+    "rom_r32_radau"
+   ],
+   "fom_over_cheapest_time_per_run": [
+    5.590612095713979,
+    5.389307933517016
+   ]
+  },
+  "3e-06": {
+   "cheapest_per_run": {
+    "ctrl_run1": "rom_r16_radau",
+    "ctrl_run2": "rom_r16_radau"
+   },
+   "cheapest_fom": null,
+   "methods_meeting": [
+    "rom_r16_P1",
+    "rom_r16_radau",
+    "rom_r32_radau"
+   ]
+  },
+  "1e-08": {
+   "cheapest_per_run": {
+    "ctrl_run1": "rom_r32_radau",
+    "ctrl_run2": "rom_r32_radau"
+   },
+   "cheapest_fom": null,
+   "methods_meeting": [
+    "rom_r32_radau"
+   ]
+  }
+ },
+ "unresolved": {
+  "rom_r8_P1_vs_fom_N128": {
+   "fom_more_accurate_cases": 27,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r8_P1_vs_fom_N256": {
+   "fom_more_accurate_cases": 36,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r8_P1_vs_fom_N512": {
+   "fom_more_accurate_cases": 40,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r8_P1_vs_fom_N1024": {
+   "fom_more_accurate_cases": 40,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_P1_vs_fom_N128": {
+   "fom_more_accurate_cases": 16,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_P1_vs_fom_N256": {
+   "fom_more_accurate_cases": 25,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_P1_vs_fom_N512": {
+   "fom_more_accurate_cases": 30,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_P1_vs_fom_N1024": {
+   "fom_more_accurate_cases": 38,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_radau_vs_fom_N128": {
+   "fom_more_accurate_cases": 16,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_radau_vs_fom_N256": {
+   "fom_more_accurate_cases": 25,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_radau_vs_fom_N512": {
+   "fom_more_accurate_cases": 30,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r16_radau_vs_fom_N1024": {
+   "fom_more_accurate_cases": 38,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r32_radau_vs_fom_N128": {
+   "fom_more_accurate_cases": 6,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r32_radau_vs_fom_N256": {
+   "fom_more_accurate_cases": 12,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r32_radau_vs_fom_N512": {
+   "fom_more_accurate_cases": 19,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  },
+  "rom_r32_radau_vs_fom_N1024": {
+   "fom_more_accurate_cases": 30,
+   "of_which_fom_error_below_reference_uncertainty": 0
+  }
+ },
+ "per_case": {
+  "rom_r8_P1_vs_fom_N128": [
+   {
+    "rom_dominates_cases": 12,
+    "rom_more_accurate_cases": 13,
+    "rom_faster_cases": 17
+   },
+   {
+    "rom_dominates_cases": 13,
+    "rom_more_accurate_cases": 13,
+    "rom_faster_cases": 19
+   }
+  ],
+  "rom_r8_P1_vs_fom_N256": [
+   {
+    "rom_dominates_cases": 4,
+    "rom_more_accurate_cases": 4,
+    "rom_faster_cases": 32
+   },
+   {
+    "rom_dominates_cases": 4,
+    "rom_more_accurate_cases": 4,
+    "rom_faster_cases": 33
+   }
+  ],
+  "rom_r8_P1_vs_fom_N512": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 0,
+    "rom_faster_cases": 40
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 0,
+    "rom_faster_cases": 40
+   }
+  ],
+  "rom_r8_P1_vs_fom_N1024": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 0,
+    "rom_faster_cases": 40
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 0,
+    "rom_faster_cases": 40
+   }
+  ],
+  "rom_r16_P1_vs_fom_N128": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 24,
+    "rom_faster_cases": 0
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 24,
+    "rom_faster_cases": 0
+   }
+  ],
+  "rom_r16_P1_vs_fom_N256": [
+   {
+    "rom_dominates_cases": 2,
+    "rom_more_accurate_cases": 15,
+    "rom_faster_cases": 2
+   },
+   {
+    "rom_dominates_cases": 2,
+    "rom_more_accurate_cases": 15,
+    "rom_faster_cases": 2
+   }
+  ],
+  "rom_r16_P1_vs_fom_N512": [
+   {
+    "rom_dominates_cases": 10,
+    "rom_more_accurate_cases": 10,
+    "rom_faster_cases": 13
+   },
+   {
+    "rom_dominates_cases": 10,
+    "rom_more_accurate_cases": 10,
+    "rom_faster_cases": 13
+   }
+  ],
+  "rom_r16_P1_vs_fom_N1024": [
+   {
+    "rom_dominates_cases": 2,
+    "rom_more_accurate_cases": 2,
+    "rom_faster_cases": 34
+   },
+   {
+    "rom_dominates_cases": 2,
+    "rom_more_accurate_cases": 2,
+    "rom_faster_cases": 31
+   }
+  ],
+  "rom_r16_radau_vs_fom_N128": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 24,
+    "rom_faster_cases": 0
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 24,
+    "rom_faster_cases": 0
+   }
+  ],
+  "rom_r16_radau_vs_fom_N256": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 15,
+    "rom_faster_cases": 0
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 15,
+    "rom_faster_cases": 0
+   }
+  ],
+  "rom_r16_radau_vs_fom_N512": [
+   {
+    "rom_dominates_cases": 10,
+    "rom_more_accurate_cases": 10,
+    "rom_faster_cases": 40
+   },
+   {
+    "rom_dominates_cases": 10,
+    "rom_more_accurate_cases": 10,
+    "rom_faster_cases": 39
+   }
+  ],
+  "rom_r16_radau_vs_fom_N1024": [
+   {
+    "rom_dominates_cases": 2,
+    "rom_more_accurate_cases": 2,
+    "rom_faster_cases": 40
+   },
+   {
+    "rom_dominates_cases": 2,
+    "rom_more_accurate_cases": 2,
+    "rom_faster_cases": 40
+   }
+  ],
+  "rom_r32_radau_vs_fom_N128": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 34,
+    "rom_faster_cases": 0
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 34,
+    "rom_faster_cases": 0
+   }
+  ],
+  "rom_r32_radau_vs_fom_N256": [
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 28,
+    "rom_faster_cases": 1
+   },
+   {
+    "rom_dominates_cases": 0,
+    "rom_more_accurate_cases": 28,
+    "rom_faster_cases": 0
+   }
+  ],
+  "rom_r32_radau_vs_fom_N512": [
+   {
+    "rom_dominates_cases": 14,
+    "rom_more_accurate_cases": 21,
+    "rom_faster_cases": 32
+   },
+   {
+    "rom_dominates_cases": 16,
+    "rom_more_accurate_cases": 21,
+    "rom_faster_cases": 35
+   }
+  ],
+  "rom_r32_radau_vs_fom_N1024": [
+   {
+    "rom_dominates_cases": 10,
+    "rom_more_accurate_cases": 10,
+    "rom_faster_cases": 39
+   },
+   {
+    "rom_dominates_cases": 10,
+    "rom_more_accurate_cases": 10,
+    "rom_faster_cases": 40
+   }
+  ]
+ }
+}
