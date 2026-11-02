@@ -25,6 +25,8 @@ Stages:
   sensitivity           error versus POD rank for tensorial, spectral Q-DEIM and hybrid
   scaling               runtime and accuracy for Nx = 128 ... 1024
   reference_resolution  Nx = 128 reference versus an Nx = 1024 FOM
+  version_compare       stored results versus a re-run under another NumPy version (reads JSON only)
+  fft_micro             FFT and tensorial-RHS primitive costs (run once per NumPy version)
 
 Figures: scripts/plot_tensorial_deim_study.py (reads the *_run1.json files).
 
@@ -1089,6 +1091,83 @@ def stage_reference_resolution(tag, fine=1024):
     save("reference_resolution", tag, out)
 
 
+# ========================================================================== stage: version_compare
+def stage_version_compare(tag, ref="run1", new="numpy2_run1",
+                          sessions=("numpy1_session2", "numpy2_session2")):
+    """Compare a re-run under another NumPy version (`new`) with the stored study results (`ref`):
+    per-case accuracy differences for every method and evaluation set, stability and threshold
+    counts, tensorial-equivalence levels, and runtime. `sessions` are two back-to-back comparison
+    runs (old NumPy, then new NumPy) that separate the version effect from machine load. Only reads
+    existing JSON files."""
+    load = lambda name, t: json.load(open(os.path.join(OUT_DIR, f"{name}_{t}.json")))
+    out = {"ref_tag": ref, "new_tag": new, "accuracy": {}, "baseline": {}, "equivalence": {}, "runtime": {}}
+    c_ref, c_new = load("comparison", ref), load("comparison", new)
+    out["env"] = {t: {k_: c["env"].get(k_) for k_ in ("python", "numpy", "scipy", "torch", "cpu", "os",
+                                                      "loadavg_start", "loadavg_end")}
+                  for t, c in ((ref, c_ref), (new, c_new))}
+    worst = 0.0
+    for set_name, methods in c_ref["accuracy"].items():
+        out["accuracy"][set_name] = {}
+        for m, v in methods.items():
+            e_ref = np.array([r["rel_l2"] for r in v["rows"]])
+            e_new = np.array([r["rel_l2"] for r in c_new["accuracy"][set_name][m]["rows"]])
+            s_ref, s_new = v["summary"], c_new["accuracy"][set_name][m]["summary"]
+            d = np.abs(e_new - e_ref)
+            worst = max(worst, float(d.max()))
+            out["accuracy"][set_name][m] = {
+                "mean_ref": s_ref["mean"], "mean_new": s_new["mean"], "max_ref": s_ref["max"], "max_new": s_new["max"],
+                "max_abs_diff_per_case": float(d.max()),
+                "max_rel_diff_per_case": float((d / np.maximum(e_ref, 1e-300)).max()),
+                "n_identical_cases": int((d == 0).sum()), "n_cases": int(d.size),
+                "counts_ref": {k_: s_ref[k_] for k_ in ("n_unstable", "n_above_1pct", "n_above_5pct", "n_above_10pct")},
+                "counts_new": {k_: s_new[k_] for k_ in ("n_unstable", "n_above_1pct", "n_above_5pct", "n_above_10pct")},
+                "energy_growth_max_ref": s_ref["energy_spurious_growth_max"],
+                "energy_growth_max_new": s_new["energy_spurious_growth_max"]}
+    out["accuracy_max_abs_diff_any_case"] = worst
+    b_ref, b_new = load("baseline", ref), load("baseline", new)
+    for key, v in b_ref["reproduced"].items():
+        if key.endswith("_per_case"):
+            d = np.abs(np.array(b_new["reproduced"][key]) - np.array(v))
+            out["baseline"][key] = {"max_abs_diff": float(d.max()), "n_identical": int((d == 0).sum())}
+    e_ref, e_new = load("equivalence", ref), load("equivalence", new)
+    for r_, v in e_ref["ranks"].items():
+        out["equivalence"][r_] = {k_: {"ref": v[k_], "new": e_new["ranks"][r_][k_]}
+                                  for k_ in ("rhs_rel_diff_max", "traj_rel_diff_max_float64_a0",
+                                             "control_eps_perturbation_rel_diff_max", "step_counts_identical")}
+    runs = {ref: c_ref, new: c_new}
+    runs.update({t: load("comparison", t) for t in sessions})
+    for t, c in runs.items():
+        out["runtime"][t] = {"numpy": c["env"]["numpy"], "loadavg_start": c["env"]["loadavg_start"],
+                             "workload_mean_ms": c["timing"]["workload_mean_ms"],
+                             "speedup_vs_fom": c["timing"]["speedup_vs_fom"],
+                             "rhs_eval_us": c["rhs_eval_us"], "fom_stage_us": c["fom_stage_us"]}
+    print(f"largest per-case accuracy difference, any method/set: {worst:.2e}")
+    for t, r_ in out["runtime"].items():
+        print(f"{t:16s} numpy {r_['numpy']:7s} FOM {r_['workload_mean_ms']['fom']:.2f} ms | tensorial "
+              f"{r_['workload_mean_ms']['tensorial|e2e']:.2f} ms ({r_['speedup_vs_fom']['tensorial|e2e']:.2f}x) | "
+              f"ROM {r_['speedup_vs_fom']['rom|e2e']:.2f}x | hybrid {r_['speedup_vs_fom']['hybrid_localfd_m16|e2e']:.2f}x"
+              f" | Q-DEIM {r_['speedup_vs_fom']['spec_qdeim_m16|e2e']:.2f}x")
+    save("version_compare", tag, out)
+
+
+# =============================================================================== stage: fft_micro
+def stage_fft_micro(tag, n_list=(128, 256, 512, 1024)):
+    """Primitive costs behind the NumPy-version dependence of the runtimes (Section 6.6 of the report):
+    one FFT + inverse FFT of a real length-n array, and the tensorial RHS contraction at r = 8."""
+    env = environment_info()
+    rng = np.random.default_rng(0)
+    out = {"fft_ifft_us": {}, "env": None}
+    for n in n_list:
+        x = rng.standard_normal(n)
+        out["fft_ifft_us"][str(n)] = _med_us(lambda: np.fft.ifft(np.fft.fft(x)), number=20000, repeat=9)
+    a, Qf, Lnu = rng.standard_normal(8), rng.standard_normal((64, 8)), rng.standard_normal((8, 8))
+    f = quadratic_rhs(Qf, Lnu)
+    out["tensorial_rhs_r8_us"] = _med_us(lambda: f(a), number=20000, repeat=9)
+    print(f"numpy {np.__version__}: fft+ifft us {out['fft_ifft_us']}, tensorial RHS r=8 {out['tensorial_rhs_r8_us']:.2f} us")
+    out["env"] = finish_env(env)
+    save("fft_micro", tag, out)
+
+
 def _med_us(fn, number=2000, repeat=9):
     return 1e6 * float(np.median(timeit.repeat(fn, number=number, repeat=repeat))) / number
 
@@ -1097,7 +1176,8 @@ STAGES = {"baseline": stage_baseline, "equivalence": stage_equivalence,
           "tensorial_bench": stage_tensorial_bench, "spectral_consistency": stage_spectral_consistency,
           "deim_sweep": stage_deim_sweep, "stability": stage_stability, "comparison": stage_comparison,
           "sensitivity": stage_sensitivity, "scaling": stage_scaling,
-          "reference_resolution": stage_reference_resolution}
+          "reference_resolution": stage_reference_resolution, "version_compare": stage_version_compare,
+          "fft_micro": stage_fft_micro}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

@@ -185,6 +185,14 @@ Requires Python 3.11 with the packages listed in `requirements.txt`: `numpy`, `s
 pip install -r requirements.txt
 ```
 
+For a reproducible environment, install the pinned lock file used by CI (Python 3.11, macOS or Linux):
+`requirements-lock.txt` (NumPy 1.26.4, the environment of the tensorial POD / spectral DEIM results) or
+`requirements-lock-numpy2.txt` (NumPy 2.4.6).
+
+```bash
+pip install --no-deps -r requirements-lock.txt && pip check
+```
+
 ## Usage
 
 ```bash
@@ -362,6 +370,9 @@ Time-aligned protocol, $r = 8$, 40 test cases, Apple M3 Pro, NumPy 1.26.4:
 - An energy-conserving projection of the reduced tensor removes spurious energy growth but, in its
   unweighted form, lowers accuracy; a variance-weighted form improves the DEIM/local-FD model
   (4.31% to 2.67%) without making it reliable.
+- Under NumPy 2.4.6 every error above is unchanged (largest per-case difference 4e-7), but the
+  speed-ups over the full solver roughly double (tensorial 4.3x to 4.4x), because NumPy 2's FFT is
+  about 3x slower at this grid size while the reduced models' small matrix products are not.
 
 ## Possible Extensions
 

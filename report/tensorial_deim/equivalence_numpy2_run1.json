@@ -1,0 +1,103 @@
+{
+ "ranks": {
+  "4": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 1.3737246333807027e-12,
+   "rhs_rel_diff_max": 3.5489676335381837e-15,
+   "rhs_rel_diff_median": 5.362360234248695e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 4.332795381394273e-16,
+   "traj_rel_diff_median_float64_a0": 1.6030809896481992e-16,
+   "traj_rel_diff_max_original_float32_a0": 1.825934911613465e-10,
+   "control_eps_perturbation_rel_diff_max": 3.6878917399995667e-16,
+   "step_counts_identical": true
+  },
+  "6": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 2.1255562612950866e-12,
+   "rhs_rel_diff_max": 6.638223754690126e-15,
+   "rhs_rel_diff_median": 6.270515961780864e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 4.276553408637861e-16,
+   "traj_rel_diff_median_float64_a0": 1.8276201040262856e-16,
+   "traj_rel_diff_max_original_float32_a0": 2.62077903766693e-10,
+   "control_eps_perturbation_rel_diff_max": 3.4684134052574615e-16,
+   "step_counts_identical": true
+  },
+  "8": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 3.046472177147839e-12,
+   "rhs_rel_diff_max": 1.3924691426916622e-14,
+   "rhs_rel_diff_median": 7.558544837735302e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 4.079508805265888e-16,
+   "traj_rel_diff_median_float64_a0": 1.7639512713773915e-16,
+   "traj_rel_diff_max_original_float32_a0": 1.9939881893024725e-10,
+   "control_eps_perturbation_rel_diff_max": 2.6439397500455983e-16,
+   "step_counts_identical": true
+  },
+  "12": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 5.2111616114502855e-12,
+   "rhs_rel_diff_max": 2.4775818165355067e-14,
+   "rhs_rel_diff_median": 6.234247199078762e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 5.545163510191782e-16,
+   "traj_rel_diff_median_float64_a0": 1.9971847371123754e-16,
+   "traj_rel_diff_max_original_float32_a0": 3.242264843969713e-10,
+   "control_eps_perturbation_rel_diff_max": 2.4741043410808007e-16,
+   "step_counts_identical": true
+  },
+  "16": {
+   "n_rhs_states": 360,
+   "rhs_abs_diff_max": 6.0004145578394165e-12,
+   "rhs_rel_diff_max": 3.739012143081727e-14,
+   "rhs_rel_diff_median": 6.224597688840212e-16,
+   "Q_jk_asymmetry_max": 0.0,
+   "traj_rel_diff_max_float64_a0": 4.62636303400112e-16,
+   "traj_rel_diff_median_float64_a0": 1.6949913460970784e-16,
+   "traj_rel_diff_max_original_float32_a0": 3.3455518918938364e-10,
+   "control_eps_perturbation_rel_diff_max": 2.7196727856847823e-16,
+   "step_counts_identical": true
+  }
+ },
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.13",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "8f9d5ba4c7a5ec8380762e78cc44245b97571aa4",
+  "git_dirty_paths": 6,
+  "loadavg_start": [
+   3.30517578125,
+   2.67431640625,
+   2.38525390625
+  ],
+  "top_cpu_processes_start": [
+   "51.9 python",
+   "  7.2 fileproviderd",
+   "  5.2 Microsoft Teams WebView Helper (Renderer)",
+   "  4.6 cloudd",
+   "  3.7 Microsoft Teams WebView"
+  ],
+  "power": "Now drawing from 'Battery Power'",
+  "torch": "2.15.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "cuda_available": false,
+  "loadavg_end": [
+   3.1103515625,
+   2.65234375,
+   2.38037109375
+  ]
+ }
+}

@@ -15,7 +15,8 @@ from `report/tensorial_deim/*.json`; the scripts that produce them are listed un
 [Reproduction](#13-reproduction). The existing verified results (README, `RESEARCH_EXTENSION.md`,
 `report/audit/`) are not modified.
 
-**Summary of findings** (r = 8, 40 test cases, time-aligned protocol, Apple M3 Pro, NumPy 1.26.4):
+**Summary of findings** (r = 8, 40 test cases, time-aligned protocol, Apple M3 Pro, NumPy 1.26.4; under
+NumPy 2.4.6 accuracy is unchanged and every speed-up over the FOM is about twice as large, Section 6.6):
 
 | Method | Mean error | Max error | Cases > 10% | End-to-end time | vs full-order solver |
 |---|---|---|---|---|---|
@@ -515,6 +516,60 @@ surrogates remain the fastest per query (0.138 ms in that session against 1.36 m
 this one), while the Galerkin models keep their extrapolation behaviour. These comparisons cross
 protocols and sessions and are indicative only.
 
+### 6.6 Re-run under NumPy 2.4.6 (`*_numpy2_run1.json`, `version_compare_numpy2.json`, `fft_micro_numpy*.json`)
+
+The study's numbers (all sections above) were measured under NumPy 1.26.4 / SciPy 1.13.1 and are kept
+as the primary record. The principal stages (`baseline`, `equivalence`, `comparison`, covering the
+original ROM, tensorial POD, the hybrid DEIM/local-FD model and spectral DEIM, Q-DEIM and oversampled
+DEIM on all four evaluation sets) were re-run unchanged under NumPy 2.4.6 / SciPy 1.17.1
+(`requirements-lock-numpy2.txt`; same machine, Python and PyTorch).
+
+**Accuracy and stability: unchanged.** Over 9 methods x 4 evaluation sets (103 cases each), the largest
+per-case difference in relative L2 error is 4.2e-7 absolute (4e-5 percentage points). Every mean,
+median, maximum, threshold count (> 1%, 5%, 10%), unstable count and spurious-energy-growth value printed
+in this report is identical under both versions; the baseline reproduction (0.0466%, 4.3113%,
+historical 0.1518%) is unchanged. Two distinct mechanisms produce the tiny differences:
+
+* For the stable models the per-case errors differ by at most 1e-6 relative, at the level of the
+  float32 output rounding; the FFT itself agrees between versions to about 1e-16, and the tensorial
+  predictions for case 5 are bit-identical (no FFT online).
+* The hybrid DEIM/local-FD model differs by up to 1.5e-4 relative (4e-7 absolute). Its first RK4 stage
+  starts from float32 a0 and float32 M; NumPy 1 keeps float32 for `float32_array / numpy.float64_scalar`
+  (legacy value-based casting), NumPy 2 promotes to float64 (NEP 50). That 1e-7 difference at t = 0 is
+  then amplified by the hybrid's positive-eigenvalue dynamics (to 4.8e-6 in the field at t = 1 on
+  steep case 5, against 1.5e-7 on smooth case 34). `src/deim.py` is the historical implementation and
+  is left unchanged.
+
+**Tensorial equivalence holds under NumPy 2.4.6**: reduced RHS within 3.7e-14 and trajectories within
+5.5e-16 (relative, r = 4 to 16), at the level of a machine-epsilon perturbation of a0 (3.7e-16), with
+identical step counts.
+
+**Runtime: strongly version-dependent.** To separate the version from machine load, the comparison was
+also run twice back to back (NumPy 1.26.4, then 2.4.6) at a load average of about 2.7:
+
+| End-to-end, 40-case mean (vs FOM) | NumPy 1.26.4, study run (load 5 to 9) | NumPy 1.26.4, same session | NumPy 2.4.6, same session | NumPy 2.4.6, first re-run |
+|---|---|---|---|---|
+| Full-order solver | 3.24 ms | 3.10 ms | 4.85 ms | 4.80 ms |
+| POD-Galerkin, original | 7.45 ms (0.44x) | 7.15 ms (0.43x) | 11.80 ms (0.41x) | 11.79 ms (0.41x) |
+| Tensorial POD-Galerkin | 1.36 ms (2.38x) | 1.29 ms (2.39x) | 1.09 ms (4.43x) | 1.11 ms (4.34x) |
+| Hybrid DEIM/local-FD | 3.48 ms (0.93x) | 3.33 ms (0.93x) | 2.65 ms (1.83x) | 2.68 ms (1.79x) |
+| Spectral DEIM m = 16 | 1.95 ms (1.67x) | 1.86 ms (1.67x) | 1.59 ms (3.06x) | 1.59 ms (3.02x) |
+| Spectral Q-DEIM m = 16 | 1.95 ms (1.66x) | 1.85 ms (1.67x) | 1.58 ms (3.06x) | 1.59 ms (3.02x) |
+| Spectral oversampled s = 32 | 2.12 ms (1.53x) | 1.98 ms (1.56x) | 1.63 ms (2.97x) | 1.64 ms (2.93x) |
+
+The study's NumPy 1.26.4 ratios reproduce within 2% at the lower load, so the change comes from the
+NumPy version: one FFT plus inverse FFT of length 128 takes 2.0 us under NumPy 1.26.4 and 6.0 us under
+2.4.6 (the FOM's nonlinear stage 10.7 us against 20.5 to 20.6 us), while the small mat-vecs of the
+reduced models are slightly faster under NumPy 2 (tensorial RHS 1.22 to 1.27 us against 1.39 to
+1.45 us). The FFT penalty is mostly a fixed per-call cost: 2.9 against 7.2 us at n = 256, 5.2 against
+10.0 us at n = 512, 13.3 against 14.7 us at n = 1024, so the version dependence is largest at the
+benchmark resolution and should shrink with Nx (the scaling study was not re-run under NumPy 2). The
+FFT-bound methods (FOM, original ROM) slow down and the hyper-reduced ones speed up, so every speed-up
+over the FOM roughly doubles and the hybrid moves from slower to faster than the FOM (as in the earlier
+NumPy 2.0.0 audit). Rankings among the reduced models, and every conclusion of this report, are the
+same under both versions; the size of the speed-ups is not a property of the methods alone.
+
+
 ---
 
 ## 7. Figures (`report/tensorial_deim/figures/`)
@@ -537,7 +592,8 @@ protocols and sessions and are indicative only.
    (r = 4 to 16), the level of a machine-epsilon perturbation of a0. *Established.*
 2. **Is tensorial POD faster than the full-order solver?** Yes on this machine: 2.38x end to end at
    Nx = 128 (2.37x in a repeat run; 1.77x to 3.79x per case) and 7.0x at Nx = 1024 (four cases).
-   *Established for this hardware and NumPy 1.26.4*; the Nx = 128 ratio depends on the FFT library.
+   *Established for this hardware*; the size of the ratio depends on the NumPy version: 4.3x to 4.4x
+   under NumPy 2.4.6, whose FFT is about 3x slower at n = 128 (Section 6.6).
 3. **Does spectral-consistent DEIM eliminate the local-FD instability?** Yes for every configuration
    tested (48 configurations at r = 8 on 80 cases, no case above 1.3%; ranks 4 to 16 with Q-DEIM,
    errors within 1% of tensorial POD's for m = 2r and up to 2x for m = r): no unstable case, negative Jacobian spectra where the hybrid's are positive. *Established for this problem family.*
@@ -576,7 +632,8 @@ cases at Nx = 128.
 * Errors are measured against the Nx = 128 discrete model, which itself differs from a resolved
   solution by up to 3.9% on the steepest cases (Section 6.4).
 * Timing is from one laptop (Apple M3 Pro) shared with other workloads, in Python/NumPy, where call
-  overhead dominates small-matrix work; the Nx = 128 speed-ups depend on the FFT library version.
+  overhead dominates small-matrix work; the Nx = 128 speed-ups roughly double between NumPy 1.26.4
+  and 2.4.6 (Section 6.6). Scaling with Nx was not re-run under NumPy 2.
   Scaling results use four cases per resolution.
 * The inherited step-size policy keeps the full-order advective bound, so reduced step counts grow
   with Nx; the hyper-reduced models' per-step cost is Nx-independent but their runtime is not.
@@ -620,12 +677,13 @@ DEIM targets; energy-conserving projections (zero cubic form, symmetry, idempote
 weighted optimality, energy non-increase along a trajectory) and exact folding of the hybrid model
 for stencil orders 2 and 4.
 
-**NumPy versions.** All reported numbers were produced with NumPy 1.26.4. NumPy 2 transforms float32
-input in single precision; since the stored basis is float32, the reduced Laplacian L is built from a
-float64 copy of the basis so that it does not depend on the NumPy version (under NumPy 1.26.4 this is
-bit-identical to the original computation, and every per-case error is unchanged). The new modules'
-tests and the existing NumPy-only tests also pass under NumPy 2.4.6 / SciPy 1.17.1, the versions the
-repository's CI installs from the unpinned `requirements.txt`.
+**NumPy versions.** All numbers before Section 6.6 were produced with NumPy 1.26.4. NumPy 2 transforms
+float32 input in single precision; since the stored basis is float32, the reduced Laplacian L is built
+from a float64 copy of the basis so that it does not depend on the NumPy version (under NumPy 1.26.4
+this is bit-identical to the original computation, and every per-case error is unchanged). The full
+suite also passes (179 passed, 1 skipped) in the pinned NumPy 2.4.6 / SciPy 1.17.1 environment, and CI
+runs it on Linux in both pinned environments (`requirements-lock.txt`, `requirements-lock-numpy2.txt`,
+installed with `pip install --no-deps` and checked with `pip check`).
 
 ## 12. Data and protocol notes
 
@@ -637,7 +695,8 @@ random choice enters the evaluation except seeded test states and perturbation d
 ## 13. Reproduction
 
 ```bash
-uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements-lock.txt
+uv venv --python 3.11 .venv && uv pip sync --python .venv/bin/python requirements-lock.txt
+uv venv --python 3.11 np2 && uv pip sync --python np2/bin/python requirements-lock-numpy2.txt
 # data/*.npz as produced by scripts/generate_dataset.py and scripts/generate_ood_dataset.py;
 # experiments/deim_basis.npz from scripts/build_deim.py
 for s in baseline equivalence tensorial_bench spectral_consistency deim_sweep stability \
@@ -645,6 +704,11 @@ for s in baseline equivalence tensorial_bench spectral_consistency deim_sweep st
   .venv/bin/python scripts/tensorial_deim_study.py $s --tag run1
 done
 VECLIB_MAXIMUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python scripts/tensorial_deim_study.py comparison --tag run2_1thread
+# NumPy 2.4.6 re-run (Section 6.6), in a second environment built from requirements-lock-numpy2.txt
+for s in baseline equivalence comparison; do np2/bin/python scripts/tensorial_deim_study.py $s --tag numpy2_run1; done
+.venv/bin/python scripts/tensorial_deim_study.py comparison --tag numpy1_session2
+np2/bin/python scripts/tensorial_deim_study.py comparison --tag numpy2_session2
+.venv/bin/python scripts/tensorial_deim_study.py version_compare --tag numpy2
 .venv/bin/python scripts/plot_tensorial_deim_study.py
 .venv/bin/python -m pytest -q tests
 ```
