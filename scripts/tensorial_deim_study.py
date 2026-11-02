@@ -38,6 +38,10 @@ from src.deim import deim_rom_predict
 from src.metrics import relative_l2
 from src.pod_rom import _burgers_rhs_physical, rom_predict, rom_reduced_trajectory
 from src.solver import solve_burgers
+from src.deim import collect_nonlinear_snapshots
+from src.spectral_deim import (build_basis, build_spectral_deim, nonlinear_snapshots,
+                               sampled_diffusion, sampled_quadratic_tensor, select_points,
+                               spectral_deim_predict)
 from src.tensorial_pod import (build_tensorial_rom, quadratic_rhs, tensorial_predict,
                                tensorial_reduced_trajectory, tensorial_rhs)
 
@@ -403,12 +407,91 @@ def stage_tensorial_bench(tag, reps=7, r_list=(4, 6, 8, 12, 16, 24)):
     save("tensorial_bench", tag, out)
 
 
+# ===================================================================== stage: spectral_consistency
+def deim_bases(Nx=NX, data=None, m_max=48):
+    """Nonlinear-only (N) and full-RHS (f) snapshot bases from the training split, m_max columns."""
+    data = data or load_data()
+    _, tnu, tU = data["train"]
+    k, dealias = wavenumbers(Nx)
+    ens = tU.reshape(-1, Nx)
+    nu_snap = np.repeat(tnu, tU.shape[1])
+    Psi_n, S_n = build_basis(nonlinear_snapshots(ens, k, dealias), m_max)
+    Psi_f, S_f = build_basis(collect_nonlinear_snapshots(ens, k, nu_snap, dealias), m_max)
+    return {"nonlinear": (Psi_n, S_n), "full": (Psi_f, S_f)}
+
+
+def stage_spectral_consistency(tag):
+    """(1) the sampled tensor reproduces P^T N(Phi a) and P^T f(Phi a) of the full-grid spectral
+    operator; (2) cross-check: target "full" with the STORED basis, points and step size reproduces
+    the historical full-grid exact-F DEIM diagnostic (report/audit/followup_stencil_run2.json)."""
+    env = environment_info()
+    data = load_data()
+    k, dealias = wavenumbers(NX)
+    bases, _ = pod_bases((4, 8, 12, 16), data=data)
+    db = deim_bases(data=data)
+    sA, snu, sU = data["test"]
+    out = {"sampled_operator": [], "historical_crosscheck": {}}
+    rng = np.random.default_rng(7)
+    for r, Phi in bases.items():
+        states = [(Phi.T @ sU[i, j]).astype(np.float64) for i in range(len(sA)) for j in range(0, 20, 3)]
+        states += [rng.standard_normal(r) * rng.uniform(0.1, 10) for _ in range(100)]
+        for m in (8, 16, 24):
+            Psi = db["nonlinear"][0][:, :m]
+            for method, s in (("deim", m), ("qdeim", m), ("qdeim+greedy", 2 * m)):
+                pts = select_points(Psi, s=s, method=method)
+                C, Ds = sampled_quadratic_tensor(Phi, pts, k, dealias), sampled_diffusion(Phi, pts, k)
+                en, ef = [], []
+                for a in states:
+                    nu = float(rng.uniform(0.005, 0.2))
+                    u = Phi @ a
+                    ref_n = _burgers_rhs_physical(u, k, 0.0, dealias)[pts]
+                    ref_f = _burgers_rhs_physical(u, k, nu, dealias)[pts]
+                    cn = (C.reshape(-1, r) @ a).reshape(len(pts), r) @ a
+                    en.append(np.abs(cn - ref_n).max() / np.abs(ref_n).max())
+                    ef.append(np.abs(cn + nu * Ds @ a - ref_f).max() / np.abs(ref_f).max())
+                out["sampled_operator"].append({"r": r, "m": m, "selection": method, "s": s,
+                                                "n_states": len(states),
+                                                "nonlinear_rel_err_max": float(max(en)),
+                                                "full_rhs_rel_err_max": float(max(ef))})
+    worst_n = max(o["nonlinear_rel_err_max"] for o in out["sampled_operator"])
+    worst_f = max(o["full_rhs_rel_err_max"] for o in out["sampled_operator"])
+    print(f"sampled operator: max rel err nonlinear {worst_n:.2e}, full RHS {worst_f:.2e} "
+          f"over {len(out['sampled_operator'])} (r, m, selection) configurations")
+
+    # ---- historical cross-check (same Psi, points, dt as the exact-F diagnostic)
+    st = stored_basis()
+    Phi, Psi, pts = st["Phi"], st["Psi"], st["points"]
+    model = build_spectral_deim(Phi, Psi, pts, k, dealias, target="full")
+    from scripts.hyperreduction_followup import dt_policy, snap_dt, stored_ctx
+    Cx = stored_ctx()
+    hist = json.load(open("report/audit/followup_stencil_run2.json"))["nx128_test40_policyR"]["per_case"]["exactF_deim"]
+    mine = []
+    for i in range(len(sA)):
+        u0, nu = sU[i, 0], float(snu[i])
+        dt = snap_dt(dt_policy("R", "deim", np.abs(u0).max(), nu, NX, Cx))
+        with np.errstate(all="ignore"):
+            u = spectral_deim_predict(u0, Phi, model, nu, T=T_FINAL, n_save=N_SAVE, dt=dt,
+                                      align_snapshots=True)[1]
+        mine.append(relative_l2(u, aligned_ref(float(sA[i]), nu)))
+    d = np.abs(np.array(mine) - np.array(hist))
+    out["historical_crosscheck"] = {
+        "description": "spectral DEIM target='full', stored Psi/points (m=16), dt of the historical run, "
+                       "vs report/audit/followup_stencil_run2.json exactF_deim (full-grid FFT then sampled)",
+        "historical_mean": float(np.mean(hist)), "spectral_deim_full_mean": float(np.mean(mine)),
+        "max_abs_diff_per_case": float(d.max()), "max_rel_diff_per_case": float((d / np.array(hist)).max()),
+        "per_case_spectral_deim_full": mine}
+    print(f"cross-check: historical exact-F mean {100*np.mean(hist):.5f}% vs sampled-tensor "
+          f"{100*np.mean(mine):.5f}%, max per-case abs diff {d.max():.1e}")
+    out["env"] = finish_env(env)
+    save("spectral_consistency", tag, out)
+
+
 def _med_us(fn, number=2000, repeat=9):
     return 1e6 * float(np.median(timeit.repeat(fn, number=number, repeat=repeat))) / number
 
 
 STAGES = {"baseline": stage_baseline, "equivalence": stage_equivalence,
-          "tensorial_bench": stage_tensorial_bench}
+          "tensorial_bench": stage_tensorial_bench, "spectral_consistency": stage_spectral_consistency}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
