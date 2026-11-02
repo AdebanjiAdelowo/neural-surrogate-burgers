@@ -174,7 +174,7 @@ neural-surrogate-burgers/
 │   └── plot_spatial_convergence_study.py figures for that study
 ├── data/                    generated train/val/test splits (not committed)
 ├── experiments/             trained checkpoints (not committed)
-├── tests/                   229 tests
+├── tests/                   230 tests
 └── report/                  evaluation figures and results; report/audit/ holds the JSON behind
                              the hyper-reduction and FNO numbers below, report/tensorial_deim/
                              the JSON and figures of the tensorial POD / spectral DEIM study
@@ -226,7 +226,7 @@ networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
 pytest
 ```
 
-229 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+230 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step
@@ -397,6 +397,10 @@ Cole-Hopf transformation (verified against an Nx = 8192 run to about 1e-11). Ful
 - A reduced-order time-step rule based on the basis (max|u0| sqrt(rho(L)) instead of the full-grid
   spacing) passed a pre-registered accuracy and stability test on every case and cuts the cost up to
   5x; an implicit Radau integrator is fastest when the reduced diffusion is stiff.
+- In a controlled benchmark on all 40 test cases (every method timed in the same loop), r = 16 tensorial
+  POD at Nx = 2048 with Radau is no less accurate than the Nx = 512 solver in mean and worst-case error and
+  1.6x to 1.75x faster; at r = 32 it is no less accurate than the Nx = 1024 solver and 4.3x to 4.6x faster.
+  On most individual smoother cases the full solver remains more accurate.
 
 ## Possible Extensions
 

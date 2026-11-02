@@ -30,6 +30,10 @@ case, and its estimated uncertainty is at most 2.2e-11 over all 48 checked cases
   An implicit Radau integrator is the fastest robust option when the reduced diffusion is stiff (r = 16,
   N >= 512). A reduced integrating-factor RK4 is the cheapest but fails the pre-registered accuracy test
   at r = 16.
+* **Controlled accuracy-runtime benchmark** (40 test cases, all methods timed in the same loop): r = 16
+  tensorial POD with Radau at N = 2048 is no less accurate than the N = 512 FOM in mean and worst case and
+  1.6x to 1.75x faster; at r = 32 it is no less accurate than the N = 1024 FOM and 4.3x to 4.6x faster. These
+  are advantages in mean and worst-case error; on most individual smoother cases the FOM is more accurate.
 
 All results are in `report/spatial_convergence/` (JSON and figures); the pre-registered plan is
 `report/spatial_convergence/PLAN.md`. Numbers come from NumPy 1.26.4 on an Apple M3 Pro unless stated.
@@ -394,11 +398,93 @@ model built at N = 2048 with r = 8 and the P1 step costs 4.9 ms for 5.4e-4: abou
 for 23% more time. Near 1e-6, the N = 512 FOM (29.7 ms, 1.4e-6) is *faster* than r = 16 tensorial POD at
 N = 2048 with explicit steps (49 ms, 6.3e-7), which is somewhat more accurate.
 
-*Indicative only (not a head-to-head benchmark):* with the implicit Radau policy the same r = 16 model took
+*Indicative only (not a head-to-head benchmark; superseded by Section 11.2):* with the implicit Radau policy the same r = 16 model took
 11.4 ms per trajectory in Section 11 (solver only, all 40 test cases, a different run and case set), and
 its time-integration error there (2e-9) implies the same 6.3e-7 accuracy. That suggests a factor of about
 2.5 over the N = 512 FOM at slightly better accuracy, but Radau was not timed in this benchmark, so the
 factor is not established.
+
+### 11.2 Controlled accuracy-runtime benchmark (`controlled_ctrl_run1.json`, `controlled_ctrl_run2.json`, `controlled_summary_ctrl.json`)
+
+This benchmark supersedes the indicative comparisons of Section 11.1 wherever they differ; those earlier
+measurements are kept unchanged.
+
+**Protocol.** All 40 test cases (no selection; includes the steepest, cases 5 and 33; the six largest A/nu,
+fixed a priori, are 5, 7, 18, 27, 33, 37), identical IC A sin x, T = 1 and 20 output times for every method.
+FOM: the float64 scheme of `src/solver.py` (the solver whose accuracy is measured) with its baseline step
+rule. Tensorial POD at N = 2048 from the 200 training trajectories; P1 = reduced CFL step (validated in
+Section 11), Radau with rtol 1e-6, atol 1e-9 and the exact Jacobian (fixed before Stage 6; nothing was
+changed after the test results of Section 11 were seen). Errors against the Cole-Hopf solution; reference
+uncertainty per case from `reference_run1.json`, at most 2.2e-11 over these cases. For each case all eight
+methods (and the ROMs' integration, projection and reconstruction separately) are timed round-robin in the
+same loop, 7 repetitions after a warm-up, so they share the same load. Same machine (Apple M3 Pro), pinned
+NumPy 1.26.4 environment; run 1 started at a 1-minute load average of 3.0, run 2 at 4.0, back to back.
+
+| method | mean error | median error | max error | max error, 6 steepest | median time, run 1 / run 2 (ms) | p10 to p90 over cases, run 1 (ms) | within-case IQR / median | ROM: integration (ms) / reconstruction | RK4 steps (FOM) or RHS evaluations (ROM) |
+|---|---|---|---|---|---|---|---|---|---|
+| FOM, N = 128 | 4.16e-03 | 1.2e-04 | 4.40e-02 | 4.4e-02 | 3.90 / 4.55 | 2.6 to 6.9 | 57% | (full solve) | 123 |
+| FOM, N = 256 | 6.12e-04 | 1.2e-07 | 1.06e-02 | 1.1e-02 | 10.44 / 11.48 | 4.7 to 15.4 | 32% | (full solve) | 215 |
+| FOM, N = 512 | 4.13e-05 | 4.0e-10 | 9.14e-04 | 9.1e-04 | 29.64 / 30.55 | 14.3 to 45.4 | 12% | (full solve) | 421 |
+| FOM, N = 1024 | 3.78e-07 | 2.7e-11 | 8.49e-06 | 8.5e-06 | 102.66 / 93.88 | 51.6 to 144.4 | 8% | (full solve) | 832 |
+| Tensorial POD, N = 2048, r = 8, reduced CFL (P1) | 6.02e-04 | 5.0e-04 | 1.56e-03 | 1.6e-03 | 5.17 / 4.43 | 2.0 to 8.9 | 48% | 4.92 / 29 us | 1298 |
+| Tensorial POD, N = 2048, r = 16, reduced CFL (P1) | 7.68e-07 | 6.1e-07 | 2.64e-06 | 2.6e-06 | 44.75 / 43.45 | 20.4 to 71.3 | 10% | 44.58 / 35 us | 8810 |
+| Tensorial POD, N = 2048, r = 16, Radau | 7.68e-07 | 6.1e-07 | 2.64e-06 | 2.6e-06 | 18.36 / 17.42 | 8.6 to 26.2 | 27% | 18.27 / 35 us | 1031 |
+| Tensorial POD, N = 2048, r = 32, Radau | 4.40e-10 | 1.9e-10 | 2.13e-09 | 1.1e-09 | 23.84 / 20.46 | 10.9 to 44.0 | 38% | 23.80 / 44 us | 900 |
+
+* **Offline cost of the ROMs** (single measurements, run 1): 200 training FOM runs at N = 2048 46 s,
+  SVD 3.5 s, tensor construction 3 / 17 / 60 ms (r = 8 / 16 / 32). Projection of u0 costs
+  about 12 us and reconstruction of the 20 snapshots 29 to 44 us: the online cost is the integration.
+* **Timing variability.** Median times differ between the two runs by 3% to 17% (FOM N = 512 and r = 16 P1:
+  3%; FOM N = 128, r = 8 P1 and r = 32 Radau: 17%). Within a case, the interquartile range of the 7 repetitions
+  is 8% to 13% of the median for the FOM at N >= 512 and P1 at r = 16, 18% to 38% for the Radau runs and
+  up to 57% for the 4 ms runs. Every comparison below
+  holds in both runs.
+* **ROM timings are environment-sensitive.** In Section 11 (policies timed only against each other) the same
+  r = 16 Radau and P1 models took 11.4 and 30.7 ms (means) on the same 40 cases, 34% and 32% less than the
+  means here (17.2 and 44.9 ms); the ratio between them is similar (2.7 there, 2.4 to 2.6 here). The cause (for example core scheduling or cache state
+  when interleaved with large FFTs) was not determined. All ROM-versus-FOM statements use this benchmark.
+
+**Matched accuracy, three views (same 40 cases, same runs).**
+
+1. *Pre-defined rule* (fixed in the code before the run): a speed-up is credited only if the ROM's mean AND
+   maximum error are both no larger than the FOM's.
+   * r = 16 Radau vs N = 512 FOM: ROM at least as accurate (mean 7.7e-7 vs 4.1e-5, max 2.6e-6 vs 9.1e-4) and
+     **1.6x faster (run 1) / 1.75x (run 2)**.
+   * r = 32 Radau vs N = 1024 FOM: ROM at least as accurate (mean 4.4e-10 vs 3.8e-7, max 2.1e-9 vs 8.5e-6) and
+     **4.3x / 4.6x faster**.
+   * r = 8 P1 vs N = 256 FOM: ROM at least as accurate (mean 6.0e-4 vs 6.1e-4, max 1.6e-3 vs 1.1e-2) and
+     **2.0x / 2.6x faster**. Against the N = 128 FOM it is more accurate but 0.75x / 1.03x as fast: **no
+     consistent speed advantage**.
+   * r = 16 Radau vs N = 1024 FOM: mixed (ROM mean worse, 7.7e-7 vs 3.8e-7; max better, 2.6e-6 vs 8.5e-6),
+     so **no speed-up is credited**, although the ROM is 5.4x to 5.6x faster.
+   * r = 16 P1 is more accurate than the N = 512 FOM but slower (0.66x / 0.70x): **no advantage**.
+   * Radau vs P1 on the same r = 16 model: identical errors, **2.4x / 2.5x faster**.
+2. *Per case* (how many of the 40 cases the ROM is both at least as accurate and faster): r = 16 Radau beats
+   the N = 512 FOM on 10 cases and the N = 1024 FOM on 2; r = 32 Radau beats N = 512 on 14 / 16 and N = 1024
+   on 10. The ROM's error is roughly uniform (set by the basis), whereas the FOM's error is tiny on smooth
+   cases and large on steep ones: the FOM is more accurate on most individual cases (for example 30 of 40 for
+   N = 512 against r = 16), the ROM in the mean and worst case. None of these per-case FOM wins falls below
+   the reference uncertainty, so all are resolved.
+3. *Target on the worst-case error* (cheapest method whose maximum error over the 40 cases meets a tolerance;
+   descriptive, computed from the stored results):
+
+| max error over 40 cases <= | cheapest method (both runs) | cheapest FOM meeting it | FOM time / cheapest time (run 1 / run 2) |
+|---|---|---|---|
+| 5e-2 | FOM N = 128 (run 1) or r = 8 P1 (run 2): a tie | N = 128 | (no claim) |
+| 1e-2 and 2e-3 | r = 8 P1 | N = 512 | 5.7x / 6.9x |
+| 1e-3 and 1e-5 | r = 16 Radau | N = 512 (1e-3), N = 1024 (1e-5) | 1.6x / 1.75x; 5.6x / 5.4x |
+| 3e-6 | r = 16 Radau | none of N = 128 to 1024 | |
+| 1e-8 | r = 32 Radau | none of N = 128 to 1024 | |
+
+**Conclusion on Radau.** The controlled benchmark establishes a computational advantage for Radau over the
+explicit reduced step on the same model (2.4x to 2.5x at identical error) and, by the pre-defined
+mean-and-maximum criterion, over the N = 512 FOM (1.6x to 1.75x, not the factor 2.5 suggested by the earlier
+indicative comparison) and, at r = 32, over the N = 1024 FOM (4.3x to 4.6x). It does not establish an advantage
+case by case: the FOMs are more accurate on most individual (smoother) cases. Whether the ROM is preferable
+therefore depends on the accuracy requirement: it is the cheaper way to guarantee a worst-case error over
+the parameter range, not the more accurate solver for every case. The offline cost (about 50 s, dominated by
+the training FOM runs) is recovered after about 4400 queries against the N = 512 FOM and about 600 against the
+N = 1024 FOM (offline time divided by the per-query saving, run 1 medians).
 
 ## 12. Discussion
 
@@ -461,14 +547,18 @@ reduced diffusion is genuinely stiff and an implicit integrator pays off.
 7. **Does refinement change the ranking?** Yes for the hybrid DEIM/local-FD model (ten times worse at
    N = 128, equal at N = 2048); no for tensorial POD versus spectral Q-DEIM. *Established for r = 8, m = 16.*
 8. **Can reduced-specific time stepping improve runtime?** Yes: the reduced CFL policy (P1) passed the
-   pre-registered test everywhere and cut RHS evaluations up to 5.1x; Radau is fastest when the reduced
-   diffusion is stiff. *Established for the tested (N, r).*
-9. **Best accuracy-runtime trade-off.** At low cost, a tensorial POD model trained on a resolved grid
-   (N = 2048, r = 8, reduced CFL step) is about four times more accurate than the N = 128 FOM at similar
-   cost (4.9 vs 4.0 ms; 5.4e-4 vs 2.0e-3 against the exact solution). *Established on 10 test cases on this
-   machine.* Near 1e-6, explicit r = 16 tensorial POD is slower than the N = 512 FOM (49 vs 30 ms) at
-   slightly better accuracy; with Radau it would plausibly be about 2.5 times faster (11.4 ms in a separate
-   run on all 40 test cases). *Hypothesis: not measured head to head.*
+   pre-registered test everywhere and cut RHS evaluations up to 5.1x; when the reduced diffusion is stiff,
+   Radau is 2.4x to 2.5x faster than P1 at identical error (controlled benchmark, Section 11.2).
+   *Established for the tested (N, r).*
+9. **Best accuracy-runtime trade-off** (controlled benchmark, Section 11.2, all 40 test cases). It depends on
+   the accuracy requirement. For a worst-case error of 1e-2 to 2e-3, r = 8 tensorial POD with the reduced
+   CFL step is the cheapest tested method (5.7x to 6.9x faster than the N = 512 FOM, the cheapest FOM that
+   meets it). For 1e-3 to 1e-5, r = 16 tensorial POD with Radau (1.6x to 1.75x faster than N = 512 at 1e-3;
+   5.4x to 5.6x faster than N = 1024 at 1e-5); below 3e-6 no tested FOM resolution qualifies and the r = 16 /
+   r = 32 Radau models are the only options. Under the stricter pre-defined criterion (ROM no worse in mean
+   and maximum error), the established speed-ups are 2.0x to 2.6x (r = 8 vs N = 256), 1.6x to 1.75x (r = 16
+   Radau vs N = 512) and 4.3x to 4.6x (r = 32 Radau vs N = 1024). Case by case the FOMs are more accurate on
+   most smoother cases. The ROMs need about 50 s offline. *Established on this machine and test split.*
 10. **Remaining limitations**: Section 13. Hypotheses not tested here: that a step rule based on the
     Jacobian's real parts (or an error-controlled IF-RK4) would combine P2's cost with P1's robustness;
     that the conclusions carry over to non-linearizable or multi-dimensional problems.
@@ -485,6 +575,9 @@ done
 .venv/bin/python scripts/spatial_convergence_study.py timestep --tag run2    # timing repeat
 .venv/bin/python scripts/spatial_convergence_study.py ranking --tag run1
 .venv/bin/python scripts/spatial_convergence_study.py benchmark --tag run2   # on an idle machine
+.venv/bin/python scripts/spatial_convergence_study.py controlled --tag ctrl_run1   # idle machine
+.venv/bin/python scripts/spatial_convergence_study.py controlled --tag ctrl_run2
+.venv/bin/python scripts/spatial_convergence_study.py controlled_summary --tag ctrl
 .venv/bin/python scripts/plot_spatial_convergence_study.py
 .venv/bin/python -m pytest -q tests
 ```
@@ -511,9 +604,9 @@ All accuracy results are deterministic; timings vary by a few percent.
 |---|---|
 | `src/convergence.py` | float64 FOM, Fourier padding/restriction and L2 errors across grids, Cole-Hopf solution |
 | `src/reduced_timestep.py` | reduced CFL bound, reduced IF-RK4, scipy integrators with step accounting |
-| `scripts/spatial_convergence_study.py` | stages spatial, temporal, reference, diagnostics, rom, timestep, benchmark, ranking |
+| `scripts/spatial_convergence_study.py` | stages spatial, temporal, reference, diagnostics, rom, timestep, benchmark, ranking, controlled, controlled_summary |
 | `scripts/plot_spatial_convergence_study.py` | Figures 1 to 14 |
-| `tests/test_convergence.py` (27), `tests/test_reduced_timestep.py` (9), `tests/test_spatial_convergence_study.py` (13) | Section 18 |
+| `tests/test_convergence.py` (27), `tests/test_reduced_timestep.py` (9), `tests/test_spatial_convergence_study.py` (14) | Section 18 |
 | `report/spatial_convergence/PLAN.md` | baseline and pre-registered plan (written before the experiments) |
 
 No existing source, data, result or report file was modified.
@@ -527,6 +620,6 @@ odd symmetry, maximum principle, mass and energy, quadrature insensitivity, agre
 spectral convergence of the FOM towards it), conservation and the maximum-principle violation of the
 under-resolved FOM, grid consistency, POD orthogonality at N = 512, the reduced Jacobian bound, the
 reduced IF-RK4 (exact linear part, fourth order, stability beyond the explicit diffusion limit), the
-scipy integrators and step accounting, the policy dispatcher and the error bookkeeping. Full suite: **228 passed, 1 skipped** (179 existing +
-49 new) in both pinned environments (`requirements-lock.txt`, NumPy 1.26.4; `requirements-lock-numpy2.txt`,
+scipy integrators and step accounting, the policy dispatcher and the error bookkeeping. Full suite: **229 passed, 1 skipped** (179 existing +
+50 new) in both pinned environments (`requirements-lock.txt`, NumPy 1.26.4; `requirements-lock-numpy2.txt`,
 NumPy 2.4.6); offline, CPU only, deterministic, no data files needed.
