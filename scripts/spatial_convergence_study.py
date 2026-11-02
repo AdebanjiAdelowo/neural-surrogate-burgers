@@ -12,6 +12,8 @@ Stages:
   rom          tensorial POD vs N and r: errors vs FOM and exact, projection errors, offline cost
   timestep     reduced time-step policies: Jacobian analysis, pre-registered acceptance, work-precision
   benchmark    interleaved runtime of the baseline FOM and tensorial POD (P0, P1) vs N and r
+  ranking      tensorial POD vs spectral Q-DEIM vs hybrid DEIM/local-FD against the exact solution
+  controlled   final controlled accuracy-runtime benchmark: FOM N = 128..1024 vs tensorial POD at N = 2048
 
 Run:  python scripts/spatial_convergence_study.py <stage> [--tag TAG]
 """
@@ -633,9 +635,194 @@ def stage_ranking(tag, n_list=(128, 512, 2048), r=8, m=16):
     save("ranking", tag, out)
 
 
+# ================================================================================ stage: controlled
+CONTROLLED_FOM_N = (128, 256, 512, 1024)
+CONTROLLED_ROMS = (("rom_r8_P1", 8, "P1_reduced_cfl"), ("rom_r16_P1", 16, "P1_reduced_cfl"),
+                   ("rom_r16_radau", 16, "P4_radau"), ("rom_r32_radau", 32, "P4_radau"))
+ROM_N = 2048
+
+
+def matched_comparisons(summary, fom_names, rom_names):
+    """Pre-defined rule (fixed before the run): a ROM is credited with a speed-up over a FOM resolution
+    only if its mean AND maximum error against the exact solution are both <= that FOM's; the ratio is
+    then FOM median time / ROM median time (> 1 means the ROM is faster at no loss of accuracy). The
+    reverse direction (FOM at least as accurate as the ROM) is reported the same way."""
+    out = []
+    for rn in rom_names:
+        r = summary[rn]
+        for fn in fom_names:
+            f = summary[fn]
+            if r["err_mean"] <= f["err_mean"] and r["err_max"] <= f["err_max"]:
+                out.append({"rom": rn, "fom": fn, "relation": "rom_at_least_as_accurate",
+                            "fom_time_over_rom_time": f["e2e_ms_median"] / r["e2e_ms_median"]})
+            elif f["err_mean"] <= r["err_mean"] and f["err_max"] <= r["err_max"]:
+                out.append({"rom": rn, "fom": fn, "relation": "fom_at_least_as_accurate",
+                            "fom_time_over_rom_time": f["e2e_ms_median"] / r["e2e_ms_median"]})
+            else:
+                out.append({"rom": rn, "fom": fn, "relation": "mixed (one better in mean, other in max)",
+                            "fom_time_over_rom_time": f["e2e_ms_median"] / r["e2e_ms_median"]})
+    return out
+
+
+def stage_controlled(tag, reps=7):
+    """Controlled accuracy-versus-runtime benchmark: the FOM at N = 128..1024 and tensorial POD at
+    N = 2048 (r = 8 and 16 with the reduced CFL step P1; r = 16 and 32 with Radau, rtol 1e-6, atol 1e-9 as
+    fixed before Stage 6) on the SAME 40 test cases, the same IC, final time and 20 output times. Every
+    method is timed round-robin inside the same loop for each case (identical load conditions), `reps`
+    repetitions after a warm-up. Errors against the Cole-Hopf solution, with each case's reference
+    uncertainty from reference_run1.json. No setting was tuned on the test results."""
+    from scripts.hyperreduction_benchmark import interleaved_timing, wavenumbers
+    from src.pod_rom import build_pod_basis
+    from src.tensorial_pod import build_tensorial_rom
+    env = environment_info()
+    data = load_data()
+    tA, tnu, _ = data["test"]
+    unc = json.load(open(os.path.join(OUT_DIR, "reference_run1.json")))["cases"]
+    # ---- offline (single measurements): training ensemble, SVD, tensors
+    trA, trnu, _ = data["train"]
+    t0 = time.perf_counter()
+    U = np.stack([solve_burgers_f64(sine_ic(float(a), ROM_N), float(v))[1] for a, v in zip(trA, trnu)])
+    t_train = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    Phi_all, _ = build_pod_basis(U.reshape(-1, ROM_N), 32)
+    t_svd = time.perf_counter() - t0
+    k, dealias = wavenumbers(ROM_N)
+    models, t_tensor = {}, {}
+    for r in (8, 16, 32):
+        Phi = np.ascontiguousarray(Phi_all[:, :r])
+        t0 = time.perf_counter()
+        models[r] = (Phi, build_tensorial_rom(Phi, k, dealias))
+        t_tensor[r] = time.perf_counter() - t0
+    del U
+    names = [f"fom_N{N}" for N in CONTROLLED_FOM_N] + [n for n, _, _ in CONTROLLED_ROMS]
+    rows = []
+    for i in range(len(tA)):
+        A, nu = float(tA[i]), float(tnu[i])
+        ex = exact(A, nu)
+        row = {"i": i, "A": A, "nu": nu, "reference_uncertainty": unc[f"test{i}"]["uncertainty_space_time"],
+               "err": {}, "steps_or_evals": {}}
+        calls = {}
+        for N in CONTROLLED_FOM_N:
+            u0 = sine_ic(A, N)
+            row["err"][f"fom_N{N}"] = rel_l2(solve_burgers_f64(u0, nu)[1], ex)
+            row["steps_or_evals"][f"fom_N{N}"] = default_step_count(A, N)
+            calls[f"fom_N{N}"] = (lambda u0=u0: solve_burgers_f64(u0, nu))
+        u0 = sine_ic(A, ROM_N)
+        for name, r, pol in CONTROLLED_ROMS:
+            Phi, m = models[r]
+            a, info = run_policy(pol, m, Phi, u0, nu)
+            row["err"][name] = rel_l2(a @ Phi.T, ex) if np.all(np.isfinite(a)) else float("inf")
+            row["steps_or_evals"][name] = info["rhs_evals"]
+            calls[f"{name}|integrate"] = (lambda Phi=Phi, m=m, pol=pol: run_policy(pol, m, Phi, u0, nu))
+            calls[f"{name}|reconstruct"] = (lambda a=a, Phi=Phi: a @ Phi.T)
+            calls[f"{name}|project"] = (lambda Phi=Phi: Phi.T @ u0)
+        t = interleaved_timing(calls, reps=reps, warmup=1)
+        row["median_ms"] = {n: 1e3 * float(np.median(v)) for n, v in t.items()}
+        row["iqr_ms"] = {n: 1e3 * float(np.subtract(*np.percentile(v, [75, 25]))) for n, v in t.items()}
+        for name, _, _ in CONTROLLED_ROMS:  # end to end = integration (incl. projection) + reconstruction
+            row["median_ms"][name] = row["median_ms"][f"{name}|integrate"] + row["median_ms"][f"{name}|reconstruct"]
+        rows.append(row)
+        print(f"case {i:2d} A/nu {A / nu:6.1f} | " + " ".join(f"{n}: {row['err'][n]:.1e}/{row['median_ms'][n]:.1f}ms"
+                                                           for n in names))
+    order = np.argsort(tA / tnu)
+    steep = set(int(j) for j in order[-6:])  # a priori: the 6 largest A/nu
+    summary = {}
+    for n in names:
+        e = np.array([x["err"][n] for x in rows])
+        tm = np.array([x["median_ms"][n] for x in rows])
+        rel_iqr = np.array([x["iqr_ms"].get(n, x["iqr_ms"].get(f"{n}|integrate")) / x["median_ms"][n] for x in rows])
+        es = np.array([x["err"][n] for x in rows if x["i"] in steep])
+        summary[n] = {"err_mean": float(e.mean()), "err_median": float(np.median(e)), "err_max": float(e.max()),
+                      "err_mean_steepest6": float(es.mean()), "err_max_steepest6": float(es.max()),
+                      "e2e_ms_median": float(np.median(tm)), "e2e_ms_mean": float(tm.mean()),
+                      "e2e_ms_p10": float(np.percentile(tm, 10)), "e2e_ms_p90": float(np.percentile(tm, 90)),
+                      "within_case_rel_iqr_median": float(np.median(rel_iqr)),
+                      "steps_or_evals_mean": float(np.mean([x["steps_or_evals"][n] for x in rows]))}
+        if n.startswith("rom"):
+            summary[n]["integrate_ms_median"] = float(np.median([x["median_ms"][f"{n}|integrate"] for x in rows]))
+            summary[n]["reconstruct_us_median"] = 1e3 * float(np.median([x["median_ms"][f"{n}|reconstruct"] for x in rows]))
+            summary[n]["project_us_median"] = 1e3 * float(np.median([x["median_ms"][f"{n}|project"] for x in rows]))
+    fom_names = [f"fom_N{N}" for N in CONTROLLED_FOM_N]
+    rom_names = [n for n, _, _ in CONTROLLED_ROMS]
+    per_case = {}  # per case: ROM both at least as accurate and faster than each FOM resolution
+    for rn in rom_names:
+        for fn in fom_names:
+            dom = sum(x["err"][rn] <= x["err"][fn] and x["median_ms"][rn] < x["median_ms"][fn] for x in rows)
+            per_case[f"{rn}_vs_{fn}"] = {"rom_dominates_cases": int(dom),
+                                         "rom_more_accurate_cases": int(sum(x["err"][rn] <= x["err"][fn] for x in rows)),
+                                         "rom_faster_cases": int(sum(x["median_ms"][rn] < x["median_ms"][fn] for x in rows))}
+    out = {"cases": "all 40 test cases", "steepest6_a_priori": sorted(steep), "rom_N": ROM_N, "reps": reps,
+           "adaptive_tol": ADAPTIVE_TOL,
+           "reference_uncertainty_max": float(max(x["reference_uncertainty"] for x in rows)),
+           "offline_s": {"training_fom_200": t_train, "pod_svd": t_svd, "tensor": t_tensor},
+           "summary": summary, "matched": matched_comparisons(summary, fom_names, rom_names),
+           "per_case": per_case, "rows": rows}
+    for n in names:
+        s_ = summary[n]
+        print(f"{n:15s} err mean {s_['err_mean']:.2e} max {s_['err_max']:.2e} | median {s_['e2e_ms_median']:.2f} ms "
+              f"(p10 {s_['e2e_ms_p10']:.2f}, p90 {s_['e2e_ms_p90']:.2f}, within-case IQR {100 * s_['within_case_rel_iqr_median']:.1f}%)")
+    for mcmp in out["matched"]:
+        print(f"{mcmp['rom']:14s} vs {mcmp['fom']:9s}: {mcmp['relation']:40s} FOM/ROM time {mcmp['fom_time_over_rom_time']:.2f}")
+    out["env"] = finish_env(env)
+    save("controlled", tag, out)
+
+
+TARGETS = (5e-2, 1e-2, 2e-3, 1e-3, 1e-5, 3e-6, 1e-8)
+
+
+def cheapest_meeting_target(summary, target):
+    """Cheapest method (median end-to-end time) whose WORST-CASE error over the case set is <= target;
+    None if no method meets it. Purely descriptive: computed from stored results, nothing is tuned."""
+    ok = [(s_["e2e_ms_median"], n) for n, s_ in summary.items() if s_["err_max"] <= target]
+    return min(ok)[1] if ok else None
+
+
+def stage_controlled_summary(tag, runs=("ctrl_run1", "ctrl_run2")):
+    """Reads the controlled runs (no computation of solutions): run-to-run timing variability,
+    target-based matched accuracy, per-case dominance and how many per-case comparisons fall below the
+    reference uncertainty (unresolved)."""
+    R = {t: json.load(open(os.path.join(OUT_DIR, f"controlled_{t}.json"))) for t in runs}
+    first = R[runs[0]]
+    names = list(first["summary"])
+    out = {"runs": runs, "variability": {}, "targets": {}, "unresolved": {}, "per_case": {}}
+    for n in names:
+        med = [R[t]["summary"][n]["e2e_ms_median"] for t in runs]
+        out["variability"][n] = {"median_ms_per_run": med, "max_rel_diff": float(max(med) / min(med) - 1),
+                                 "within_case_rel_iqr_median": [R[t]["summary"][n]["within_case_rel_iqr_median"]
+                                                                for t in runs]}
+    for tau in TARGETS:
+        picks = {t: cheapest_meeting_target(R[t]["summary"], tau) for t in runs}
+        fom_ok = [n for n in names if n.startswith("fom") and first["summary"][n]["err_max"] <= tau]
+        best_fom = min(fom_ok, key=lambda n: first["summary"][n]["e2e_ms_median"]) if fom_ok else None
+        entry = {"cheapest_per_run": picks, "cheapest_fom": best_fom,
+                 "methods_meeting": [n for n in names if first["summary"][n]["err_max"] <= tau]}
+        if best_fom and picks[runs[0]] and picks[runs[0]] != best_fom:
+            entry["fom_over_cheapest_time_per_run"] = [R[t]["summary"][best_fom]["e2e_ms_median"] /
+                                                       R[t]["summary"][picks[t]]["e2e_ms_median"] for t in runs]
+        out["targets"][f"{tau:g}"] = entry
+    rows = first["rows"]
+    for rn in [n for n in names if n.startswith("rom")]:
+        for fn in [n for n in names if n.startswith("fom")]:
+            fom_better = [x for x in rows if x["err"][fn] < x["err"][rn]]
+            out["unresolved"][f"{rn}_vs_{fn}"] = {
+                "fom_more_accurate_cases": len(fom_better),
+                "of_which_fom_error_below_reference_uncertainty": int(sum(x["err"][fn] <= x["reference_uncertainty"]
+                                                                          for x in fom_better))}
+            out["per_case"][f"{rn}_vs_{fn}"] = [R[t]["per_case"][f"{rn}_vs_{fn}"] for t in runs]
+    for tau, e in out["targets"].items():
+        print(f"max error <= {tau:6s}: cheapest {e['cheapest_per_run']}, cheapest FOM {e['cheapest_fom']}, "
+              f"FOM/cheapest time {[round(v, 2) for v in e.get('fom_over_cheapest_time_per_run', [])]}")
+    for k_, v in out["unresolved"].items():
+        if v["fom_more_accurate_cases"]:
+            print(f"{k_:28s} FOM more accurate on {v['fom_more_accurate_cases']:2d} cases, "
+                  f"{v['of_which_fom_error_below_reference_uncertainty']} of them below the reference uncertainty")
+    save("controlled_summary", tag, out)
+
+
 STAGES = {"spatial": stage_spatial, "temporal": stage_temporal, "reference": stage_reference,
           "diagnostics": stage_diagnostics, "rom": stage_rom, "timestep": stage_timestep,
-          "benchmark": stage_benchmark, "ranking": stage_ranking}
+          "benchmark": stage_benchmark, "ranking": stage_ranking, "controlled": stage_controlled,
+          "controlled_summary": stage_controlled_summary}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

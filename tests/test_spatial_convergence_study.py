@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 
 from scripts.hyperreduction_benchmark import wavenumbers
-from scripts.spatial_convergence_study import (CASES, POLICIES, TIMES, err_record, project, run_policy)
+from scripts.spatial_convergence_study import (CASES, POLICIES, TIMES, err_record, matched_comparisons,
+                                               project, run_policy)
 from src.convergence import grid, rel_l2, resample, sine_ic, sine_solution, solve_burgers_f64
 from src.pod_rom import build_pod_basis
 from src.tensorial_pod import build_tensorial_rom
@@ -80,3 +81,15 @@ def test_every_policy_runs_and_agrees_with_the_current_policy(policy):
 
 def test_case_list_is_the_pre_registered_one():
     assert len(CASES) == 11 and CASES["corner_highA_lownu"] == (2.0, 0.01)
+
+
+def test_matched_comparison_credits_a_speed_up_only_at_no_loss_of_accuracy():
+    summ = {"fom_a": {"err_mean": 1e-3, "err_max": 1e-2, "e2e_ms_median": 10.0},
+            "fom_b": {"err_mean": 1e-6, "err_max": 1e-5, "e2e_ms_median": 100.0},
+            "fom_c": {"err_mean": 1e-4, "err_max": 1e-5, "e2e_ms_median": 50.0},
+            "rom": {"err_mean": 1e-5, "err_max": 1e-4, "e2e_ms_median": 20.0}}
+    res = {m["fom"]: m for m in matched_comparisons(summ, ["fom_a", "fom_b", "fom_c"], ["rom"])}
+    assert res["fom_a"]["relation"] == "rom_at_least_as_accurate"   # ROM better in mean and max
+    assert res["fom_a"]["fom_time_over_rom_time"] == pytest.approx(0.5)  # ... but slower: ratio < 1
+    assert res["fom_b"]["relation"] == "fom_at_least_as_accurate"
+    assert res["fom_c"]["relation"].startswith("mixed")             # no speed-up claim either way
