@@ -11,6 +11,7 @@ Stages:
   diagnostics  Fourier spectra, front resolution, mass, energy budget, maximum principle, gradients
   rom          tensorial POD vs N and r: errors vs FOM and exact, projection errors, offline cost
   timestep     reduced time-step policies: Jacobian analysis, pre-registered acceptance, work-precision
+  benchmark    interleaved runtime of the baseline FOM and tensorial POD (P0, P1) vs N and r
 
 Run:  python scripts/spatial_convergence_study.py <stage> [--tag TAG]
 """
@@ -515,8 +516,126 @@ def stage_timestep(tag, n_list=(128, 512, 2048), r_list=(8, 16), reps=5):
     save("timestep", tag, out)
 
 
+# ================================================================================= stage: benchmark
+def stage_benchmark(tag, n_list=(128, 512, 2048), r_list=(8, 16, 32), reps=7):
+    """Interleaved runtime of the baseline FOM (src/solver.py, as used) and tensorial POD with the
+    current (P0) and reduced-CFL (P1) step policies, on 10 test cases chosen a priori by A/nu rank:
+    solver-only, reconstruction, end-to-end (projection + integration + reconstruction), plus the
+    accuracy of each against the exact solution."""
+    from scripts.hyperreduction_benchmark import interleaved_timing, wavenumbers
+    from src.convergence import resample
+    from src.pod_rom import build_pod_basis
+    from src.solver import solve_burgers
+    from src.tensorial_pod import build_tensorial_rom
+    env = environment_info()
+    data = load_data()
+    tA, tnu, _ = data["test"]
+    order = np.argsort(tA / tnu)
+    picks = [int(order[q]) for q in range(0, 40, 4)]
+    out = {"cases": picks, "reps": reps, "by_N": {}}
+    for N in n_list:
+        U, _ = training_ensemble(N, data)
+        t0 = time.perf_counter()
+        Phi_all, _ = build_pod_basis(U.reshape(-1, N), max(r_list))
+        t_svd = time.perf_counter() - t0
+        k, dealias = wavenumbers(N)
+        rows, t_tensor = [], {}
+        models = {}
+        for r in r_list:
+            t0 = time.perf_counter()
+            models[r] = (np.ascontiguousarray(Phi_all[:, :r]),
+                         build_tensorial_rom(np.ascontiguousarray(Phi_all[:, :r]), k, dealias))
+            t_tensor[r] = time.perf_counter() - t0
+        for i in picks:
+            A, nu = float(tA[i]), float(tnu[i])
+            u0 = sine_ic(A, N)
+            ex = exact(A, nu)
+            calls = {"fom": (lambda: solve_burgers(A, nu, Nx=N, align_snapshots=True))}
+            acc = {"fom": rel_l2(solve_burgers_f64(u0, nu)[1], ex)}
+            for r in r_list:
+                Phi, m = models[r]
+                for pol in ("P0_reduced", "P1_reduced_cfl"):
+                    calls[f"r{r}|{pol}|solver"] = (lambda Phi=Phi, m=m, pol=pol: run_policy(pol, m, Phi, u0, nu))
+                    calls[f"r{r}|{pol}|e2e"] = (lambda Phi=Phi, m=m, pol=pol:
+                                                run_policy(pol, m, Phi, u0, nu)[0] @ Phi.T)
+                    acc[f"r{r}|{pol}"] = rel_l2(run_policy(pol, m, Phi, u0, nu)[0] @ Phi.T, ex)
+                a_dummy = run_policy("P1_reduced_cfl", m, Phi, u0, nu)[0]
+                calls[f"r{r}|reconstruct"] = (lambda a=a_dummy, Phi=Phi: a @ Phi.T)
+            t = interleaved_timing(calls, reps=reps, warmup=1)
+            rows.append({"i": i, "A": A, "nu": nu, "median_ms": {n: 1e3 * float(np.median(v)) for n, v in t.items()},
+                         "iqr_ms": {n: 1e3 * float(np.subtract(*np.percentile(v, [75, 25]))) for n, v in t.items()},
+                         "err_vs_exact": acc})
+        names = list(rows[0]["median_ms"])
+        mean = {n: float(np.mean([x["median_ms"][n] for x in rows])) for n in names}
+        out["by_N"][N] = {"offline_s": {"pod_svd": t_svd, "tensor": t_tensor}, "rows": rows, "mean_ms": mean,
+                          "speedup_vs_fom": {n: mean["fom"] / v for n, v in mean.items()},
+                          "err_mean": {n: float(np.mean([x["err_vs_exact"][n] for x in rows])) for n in rows[0]["err_vs_exact"]}}
+        print(f"N={N}: FOM {mean['fom']:.2f} ms | " + " | ".join(
+            f"r{r} P0 {mean[f'r{r}|P0_reduced|e2e']:.2f} P1 {mean[f'r{r}|P1_reduced_cfl|e2e']:.2f} ms" for r in r_list))
+    out["env"] = finish_env(env)
+    save("benchmark", tag, out)
+
+
+# =================================================================================== stage: ranking
+def stage_ranking(tag, n_list=(128, 512, 2048), r=8, m=16):
+    """Do the method rankings of the earlier study (tensorial POD vs spectral Q-DEIM vs hybrid
+    DEIM/local-FD, r = 8, m = 16) survive when errors are measured against the exact solution, at
+    several resolutions? Bases rebuilt at each N from the 200 training trajectories (float64)."""
+    from scripts.hyperreduction_benchmark import wavenumbers
+    from src.deim import (build_deim_basis, build_deim_projector, collect_nonlinear_snapshots,
+                          deim_rom_reduced_trajectory, select_deim_points)
+    from src.pod_rom import build_pod_basis
+    from src.spectral_deim import (build_basis, build_spectral_deim, nonlinear_snapshots, select_points,
+                                   spectral_deim_reduced_trajectory)
+    from src.tensorial_pod import build_tensorial_rom, tensorial_reduced_trajectory
+    env = environment_info()
+    data = load_data()
+    tA, tnu, _ = data["test"]
+    out = {"r": r, "m": m, "by_N": {}}
+    for N in n_list:
+        U, trnu = training_ensemble(N, data)
+        ens = U.reshape(-1, N)
+        k, dealias = wavenumbers(N)
+        Phi, _ = build_pod_basis(ens, r)
+        tens = build_tensorial_rom(Phi, k, dealias)
+        Psi_n, _ = build_basis(nonlinear_snapshots(ens, k, dealias), m)
+        spec = build_spectral_deim(Phi, Psi_n, select_points(Psi_n, method="qdeim"), k, dealias)
+        Psi_f, _ = build_deim_basis(collect_nonlinear_snapshots(ens, k, np.repeat(trnu, U.shape[1]), dealias), m)
+        pts = select_deim_points(Psi_f)
+        M = build_deim_projector(Phi, Psi_f, pts)
+        errs = {"fom": [], "tensorial": [], "spectral_qdeim": [], "hybrid_localfd": []}
+        vs_fom = {"tensorial": [], "spectral_qdeim": [], "hybrid_localfd": []}
+        for i in range(len(tA)):
+            A, nu = float(tA[i]), float(tnu[i])
+            u0 = sine_ic(A, N)
+            a0, mx = Phi.T @ u0, float(np.abs(u0).max())
+            ex = exact(A, nu)
+            fom = solve_burgers_f64(u0, nu)[1]
+            errs["fom"].append(rel_l2(fom, ex))
+            with np.errstate(all="ignore"):
+                sols = {"tensorial": tensorial_reduced_trajectory(a0, mx, tens, nu, T_FINAL, N_SAVE, align_snapshots=True)[1],
+                        "spectral_qdeim": spectral_deim_reduced_trajectory(a0, mx, spec, nu, T_FINAL, N_SAVE,
+                                                                          align_snapshots=True)[1],
+                        "hybrid_localfd": deim_rom_reduced_trajectory(a0, mx, Phi, M, pts, N, nu, T_FINAL, N_SAVE,
+                                                                      align_snapshots=True)[1]}
+            for name, a in sols.items():
+                u = a @ Phi.T
+                ok = bool(np.all(np.isfinite(u)))
+                errs[name].append(rel_l2(u, ex) if ok else float("inf"))
+                vs_fom[name].append(rel_l2(u, fom) if ok else float("inf"))
+        summ = {n: {"mean": float(np.mean(v)), "median": float(np.median(v)), "max": float(np.max(v)),
+                    "n_above_10pct": int(np.sum(np.array(v) > 0.1))} for n, v in errs.items()}
+        out["by_N"][N] = {"vs_exact": summ, "vs_fom_mean": {n: float(np.mean(v)) for n, v in vs_fom.items()},
+                          "per_case_vs_exact": errs}
+        print(f"N={N}: " + " | ".join(f"{n} {s['mean']:.2e} (max {s['max']:.1e}, >10% {s['n_above_10pct']})"
+                                      for n, s in summ.items()))
+    out["env"] = finish_env(env)
+    save("ranking", tag, out)
+
+
 STAGES = {"spatial": stage_spatial, "temporal": stage_temporal, "reference": stage_reference,
-          "diagnostics": stage_diagnostics, "rom": stage_rom, "timestep": stage_timestep}
+          "diagnostics": stage_diagnostics, "rom": stage_rom, "timestep": stage_timestep,
+          "benchmark": stage_benchmark, "ranking": stage_ranking}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
