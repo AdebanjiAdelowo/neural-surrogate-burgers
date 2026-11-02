@@ -15,8 +15,18 @@ Historical index-wise numbers (the README Results table) are a different protoco
 reproduced in `baseline`, never mixed with the aligned ones.
 
 Stages:
-  baseline     environment, verified-baseline reproduction (aligned + historical protocols)
-  equivalence  tensorial vs original POD-Galerkin: RHS and trajectories, several ranks
+  baseline              environment, verified-baseline reproduction (aligned + historical protocols)
+  equivalence           tensorial vs original POD-Galerkin: RHS and trajectories, several ranks
+  tensorial_bench       tensorial accuracy on all sets, runtime vs FOM / original ROM, rank sweep
+  spectral_consistency  sampled spectral tensor vs full-grid operator; historical exact-F cross-check
+  deim_sweep            48 spectral-DEIM configurations (+ hybrid local-FD), selection on val
+  stability             error decomposition, Jacobians, perturbation growth, energy, EC variants
+  comparison            all methods, all sets, interleaved timing on the 40 test cases
+  sensitivity           error versus POD rank for tensorial, spectral Q-DEIM and hybrid
+  scaling               runtime and accuracy for Nx = 128 ... 1024
+  reference_resolution  Nx = 128 reference versus an Nx = 1024 FOM
+
+Figures: scripts/plot_tensorial_deim_study.py (reads the *_run1.json files).
 
 Run:  python scripts/tensorial_deim_study.py <stage> [--tag TAG]
 """
@@ -789,13 +799,305 @@ def stage_stability(tag, perturb=1e-7):
     save("stability", tag, out)
 
 
+# ================================================================================ stage: comparison
+COMPARISON_DEIM = {  # name -> (target, m, s, selection); canonical m = 16 plus the val-selected ones
+    "spec_deim_m16": ("nonlinear", 16, 16, "deim"),
+    "spec_qdeim_m16": ("nonlinear", 16, 16, "qdeim"),
+    "spec_oversampled_m16_s32": ("nonlinear", 16, 32, "qdeim+greedy"),
+    "spec_valbest_nonlinear": ("nonlinear", 8, 12, "qdeim_extended"),
+    "spec_valbest_full": ("full", 12, 24, "qdeim_extended"),
+}
+
+
+def method_registry(Phi, data, k, dealias, Nx=NX, hybrid_op=None, db=None, sigma=None,
+                    deim_cfgs=COMPARISON_DEIM):
+    """{name: {"predict": f(u0, nu) -> (n_save, Nx), "solver": f(a0, u0max, nu) -> a_save, "offline_s",
+    "online_bytes"}} for every reduced model compared at one grid size."""
+    reg = {}
+    reg["rom"] = {"predict": lambda u0, nu: rom_predict(u0, Phi, k, nu, dealias, T=T_FINAL, n_save=N_SAVE,
+                                                        align_snapshots=True)[1],
+                  "solver": lambda a0, mx, nu: rom_reduced_trajectory(a0, mx, Phi, k, nu, dealias, T_FINAL, N_SAVE,
+                                                                      align_snapshots=True)[1],
+                  "offline_s": 0.0, "online_bytes": int(Phi.nbytes + k.nbytes + dealias.nbytes)}
+    t0 = time.perf_counter()
+    tens = build_tensorial_rom(Phi, k, dealias)
+    reg["tensorial"] = {"predict": lambda u0, nu: tensorial_predict(u0, Phi, tens, nu, T=T_FINAL, n_save=N_SAVE,
+                                                                    align_snapshots=True)[1],
+                        "solver": lambda a0, mx, nu: tensorial_reduced_trajectory(a0, mx, tens, nu, T_FINAL, N_SAVE,
+                                                                                  align_snapshots=True)[1],
+                        "offline_s": time.perf_counter() - t0, "online_bytes": int(tens.Q.nbytes + tens.L.nbytes)}
+    M, pts = hybrid_op
+    reg["hybrid_localfd_m16"] = {
+        "predict": lambda u0, nu: deim_rom_predict(u0, Phi, M, pts, Nx, nu=nu, T=T_FINAL, n_save=N_SAVE,
+                                                   align_snapshots=True)[1],
+        "solver": lambda a0, mx, nu: deim_rom_reduced_trajectory(a0, mx, Phi, M, pts, Nx, nu, T_FINAL, N_SAVE,
+                                                                 align_snapshots=True)[1],
+        "offline_s": float("nan"), "online_bytes": int(M.nbytes + 3 * len(pts) * Phi.shape[1] * 8)}
+    for name, cfg in deim_cfgs.items():
+        t0 = time.perf_counter()
+        mdl, _ = build_config(Phi, db, *cfg, k, dealias)
+        reg[name] = {"predict": (lambda mdl: lambda u0, nu: spectral_deim_predict(
+                         u0, Phi, mdl, nu, T=T_FINAL, n_save=N_SAVE, align_snapshots=True)[1])(mdl),
+                     "solver": (lambda mdl: lambda a0, mx, nu: spectral_deim_reduced_trajectory(
+                         a0, mx, mdl, nu, T_FINAL, N_SAVE, align_snapshots=True)[1])(mdl),
+                     "offline_s": time.perf_counter() - t0,
+                     "online_bytes": int(mdl.M.nbytes + mdl.C.nbytes + mdl.Lin.nbytes),
+                     "config": cfg, "conditioning": mdl.conditioning}
+    if sigma is not None:
+        Qh, Kh = fold_hybrid_localfd(Phi, M, pts, Nx)
+        wec = quadratic_model(weighted_energy_conserving_tensor(Qh, sigma), Kh, Nx)
+        reg["wec_hybrid_localfd_m16"] = {
+            "predict": lambda u0, nu: tensorial_predict(u0, Phi, wec, nu, T=T_FINAL, n_save=N_SAVE,
+                                                        align_snapshots=True)[1],
+            "solver": lambda a0, mx, nu: tensorial_reduced_trajectory(a0, mx, wec, nu, T_FINAL, N_SAVE,
+                                                                      align_snapshots=True)[1],
+            "offline_s": float("nan"), "online_bytes": int(wec.Q.nbytes + wec.L.nbytes)}
+    return reg
+
+
+def training_sigma(Phi, U_train):
+    return np.sqrt(np.mean((U_train.reshape(-1, Phi.shape[0]).astype(np.float64) @ Phi) ** 2, axis=0))
+
+
+def stage_comparison(tag, reps=7):
+    env = environment_info()
+    data = load_data()
+    k, dealias = wavenumbers(NX)
+    st = stored_basis()
+    Phi = st["Phi"]
+    t0 = time.perf_counter()
+    db = deim_bases(data=data)
+    deim_basis_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    pod_bases((8,), data=data)
+    pod_s = time.perf_counter() - t0
+    reg = method_registry(Phi, data, k, dealias, hybrid_op=(st["M"], st["points"]), db=db,
+                          sigma=training_sigma(Phi, data["train"][2]))
+    out = {"r": 8, "methods": list(reg), "offline_common_s": {"pod_basis_incl_snapshot_rhs": pod_s,
+                                                              "deim_snapshot_bases_nonlinear_and_full": deim_basis_s},
+           "offline_s": {n: v["offline_s"] for n, v in reg.items()},
+           "online_bytes": {n: v["online_bytes"] for n, v in reg.items()},
+           "conditioning": {n: v.get("conditioning") for n, v in reg.items()},
+           "accuracy": {}, "timing": {}}
+    params = {s_: case_params(s_, data) for s_ in ("test", "val", "extrap", "ood")}
+    for set_name in ("test", "val", "extrap", "ood"):
+        cases = case_set(set_name, data)
+        out["accuracy"][set_name] = {}
+        for name, mth in reg.items():
+            rows = []
+            for ci, (lab, u0, nu, ref) in enumerate(cases):
+                with np.errstate(all="ignore"):
+                    u = mth["predict"](u0, nu)
+                row = {"case": lab, "nu": nu, **physical_diagnostics(u, ref)}
+                if params[set_name] is not None:
+                    row["A"] = params[set_name][ci][0]
+                rows.append(row)
+            out["accuracy"][set_name][name] = {"summary": summarize(rows), "rows": rows}
+        print(set_name, {n: f"{100*v['summary']['mean']:.4f}%" for n, v in out["accuracy"][set_name].items()})
+
+    sA, snu, sU = data["test"]
+    per_case = []
+    for i in range(len(sA)):
+        A, nu, u0 = float(sA[i]), float(snu[i]), sU[i, 0]
+        a0, mx = Phi.T @ u0, np.abs(u0).max()
+        calls = {"fom": (lambda A=A, nu=nu: solve_burgers(A=A, nu=nu, Nx=NX, T=T_FINAL, n_save=N_SAVE,
+                                                          align_snapshots=True))}
+        for name, mth in reg.items():
+            calls[name + "|solver"] = (lambda f=mth["solver"], a0=a0, mx=mx, nu=nu: f(a0, mx, nu))
+            calls[name + "|e2e"] = (lambda f=mth["predict"], u0=u0, nu=nu: f(u0, nu))
+        with np.errstate(all="ignore"):
+            t = interleaved_timing(calls, reps=reps, warmup=2)
+        per_case.append({"i": i, "median_s": {n: float(np.median(v)) for n, v in t.items()},
+                         "iqr_over_median": {n: float(np.subtract(*np.percentile(v, [75, 25])) / np.median(v))
+                                             for n, v in t.items()}})
+    names = list(per_case[0]["median_s"])
+    work = {n: float(np.sum([c["median_s"][n] for c in per_case])) for n in names}
+    out["timing"] = {"reps": reps, "per_case": per_case,
+                     "workload_mean_ms": {n: 1e3 * work[n] / len(per_case) for n in names},
+                     "speedup_vs_fom": {n: work["fom"] / work[n] for n in names},
+                     "speedup_vs_rom_e2e": {n: work["rom|e2e"] / work[n] for n in names},
+                     "per_case_speedup_vs_fom": {n: stats([c["median_s"]["fom"] / c["median_s"][n]
+                                                           for c in per_case]) for n in names},
+                     "median_iqr_over_median": {n: float(np.median([c["iqr_over_median"][n] for c in per_case]))
+                                                for n in names}}
+    # RHS cost per evaluation (r = 8), same state
+    a = (Phi.T @ sU[0, 5]).astype(np.float64)
+    nu = float(snu[0])
+    rhs = {"rom": lambda: Phi.T @ _burgers_rhs_physical(Phi @ a, k, nu, dealias)}
+    tens = build_tensorial_rom(Phi, k, dealias)
+    f_t = quadratic_rhs(tens.Q_flat, nu * tens.L)
+    rhs["tensorial"] = lambda: f_t(a)
+    for name, cfg in COMPARISON_DEIM.items():
+        mdl, _ = build_config(Phi, db, *cfg, k, dealias)
+        f_d = deim_rhs_fn(mdl, nu)
+        rhs[name] = (lambda f=f_d: f(a))
+    from scripts.hyperreduction_followup import deim_rhs_fn as hybrid_rhs_fn, stored_ctx
+    f_h = hybrid_rhs_fn(stored_ctx(), nu)
+    rhs["hybrid_localfd_m16"] = lambda: f_h(a)
+    out["rhs_eval_us"] = {n: _med_us(f) for n, f in rhs.items()}
+    out["fom_stage_us"] = _med_us(lambda: _burgers_rhs_physical(sU[0, 5].astype(np.float64), k, 0.0, dealias))
+    print("RHS us", {n: round(v, 2) for n, v in out["rhs_eval_us"].items()})
+    print("mean ms", {n: round(v, 3) for n, v in out["timing"]["workload_mean_ms"].items()})
+    print("speed-up vs FOM", {n: round(v, 2) for n, v in out["timing"]["speedup_vs_fom"].items()})
+    out["env"] = finish_env(env)
+    save("comparison", tag, out)
+
+
+# =============================================================================== stage: sensitivity
+def stage_sensitivity(tag, r_list=(4, 6, 8, 12, 16)):
+    """Error versus POD rank r for tensorial POD, spectral Q-DEIM (m = r, 2r; s = m, 2m) and the hybrid
+    local-FD model (m = 2r), on the 40 test cases (aligned protocol)."""
+    env = environment_info()
+    data = load_data()
+    k, dealias = wavenumbers(NX)
+    bases, _ = pod_bases(r_list, data=data)
+    db = deim_bases(data=data)
+    _, tnu, tU = data["train"]
+    _, _, dm, _, _ = build_bases(tU, tnu, NX, r_max=8, m_list=tuple(2 * r for r in r_list))
+    cases = case_set("test", data)
+    out = {"rows": []}
+    for r in r_list:
+        Phi = bases[r]
+        tens = build_tensorial_rom(Phi, k, dealias)
+        models = {"tensorial": None}
+        for m in (r, 2 * r):
+            for s in (m, 2 * m):
+                models[f"spec_qdeim_m{m}_s{s}"] = ("nonlinear", m, s, "qdeim" if s == m else "qdeim+greedy")
+        models[f"hybrid_localfd_m{2 * r}"] = "hybrid"
+        for name, cfg in models.items():
+            if cfg is None:
+                pred = lambda u0, nu: tensorial_predict(u0, Phi, tens, nu, T=T_FINAL, n_save=N_SAVE,
+                                                        align_snapshots=True)[1]
+                cond = None
+            elif cfg == "hybrid":
+                Psi_h, pts_h = dm[2 * r]["Psi"], dm[2 * r]["points"]
+                M_h = build_deim_projector(Phi, Psi_h, pts_h)
+                pred = lambda u0, nu: deim_rom_predict(u0, Phi, M_h, pts_h, NX, nu=nu, T=T_FINAL,
+                                                       n_save=N_SAVE, align_snapshots=True)[1]
+                cond = interpolation_conditioning(Psi_h, pts_h)
+            else:
+                mdl, _ = build_config(Phi, db, *cfg, k, dealias)
+                pred = (lambda mdl: lambda u0, nu: spectral_deim_predict(u0, Phi, mdl, nu, T=T_FINAL,
+                                                                         n_save=N_SAVE, align_snapshots=True)[1])(mdl)
+                cond = mdl.conditioning
+            rows = []
+            for lab, u0, nu, ref in cases:
+                with np.errstate(all="ignore"):
+                    rows.append({"case": lab, "nu": nu, **physical_diagnostics(pred(u0, nu), ref)})
+            row = {"r": r, "method": name, "conditioning": cond, "summary": summarize(rows),
+                   "per_case": [x["rel_l2"] for x in rows]}
+            out["rows"].append(row)
+            s_ = row["summary"]
+            print(f"r={r:2d} {name:24s} mean {100*s_['mean']:.4f}% max {100*s_['max']:.3f}% "
+                  f"unstable {s_['n_unstable']} >10% {s_['n_above_10pct']}")
+    out["env"] = finish_env(env)
+    save("sensitivity", tag, out)
+
+
+# =================================================================================== stage: scaling
+def stage_scaling(tag, nx_list=(128, 256, 512, 1024), reps=5):
+    """Runtime and accuracy versus grid size. Bases are rebuilt at each Nx from the first n_train
+    historical training parameters (all 200 stored trajectories at Nx = 128, 100 otherwise, as in
+    report/audit/followup_production_validation_run1.json)."""
+    from scripts.hyperreduction_benchmark import _fom_ensemble
+    env = environment_info()
+    data = load_data()
+    tA, tnu, _ = data["test"]
+    order = np.argsort(tA / tnu)
+    timing_cases = sorted({int(order[0]), int(order[20]), int(order[39]), 13})  # a priori: smooth .. steep
+    out = {"timing_cases": timing_cases, "rows": []}
+    for Nx in nx_list:
+        k, dealias = wavenumbers(Nx)
+        if Nx == NX:
+            _, nu_tr, U = data["train"]
+        else:
+            _, nu_tr, U = _fom_ensemble(Nx, 100)
+        t0 = time.perf_counter()
+        Pf, _, dm, _, _ = build_bases(U, nu_tr, Nx, r_max=8, m_list=(16,))
+        pod_s = time.perf_counter() - t0
+        Phi = stored_basis()["Phi"] if Nx == NX else np.ascontiguousarray(Pf[:, :8])
+        if Nx == NX:
+            st = stored_basis()
+            hyb = (st["M"], st["points"])
+        else:
+            hyb = (build_deim_projector(Phi, dm[16]["Psi"], dm[16]["points"]), dm[16]["points"])
+        ens = U.reshape(-1, Nx)
+        Psi_n, _ = build_basis(nonlinear_snapshots(ens, k, dealias), 32)
+        db = {"nonlinear": (Psi_n, None)}
+        cfgs = {"spec_qdeim_m16": ("nonlinear", 16, 16, "qdeim"),
+                "spec_oversampled_m16_s32": ("nonlinear", 16, 32, "qdeim+greedy")}
+        reg = method_registry(Phi, None, k, dealias, Nx=Nx, hybrid_op=hyb, db=db, deim_cfgs=cfgs)
+        row = {"Nx": Nx, "n_train": int(U.shape[0]), "pod_and_snapshot_rhs_s": pod_s,
+               "offline_s": {n: v["offline_s"] for n, v in reg.items()},
+               "online_bytes": {n: v["online_bytes"] for n, v in reg.items()}, "cases": []}
+        for i in timing_cases:
+            A, nu = float(tA[i]), float(tnu[i])
+            u0 = (A * np.sin(np.linspace(0, L, Nx, endpoint=False))).astype(np.float32)
+            a0, mx = Phi.T @ u0, np.abs(u0).max()
+            calls = {"fom": (lambda A=A, nu=nu: solve_burgers(A=A, nu=nu, Nx=Nx, T=T_FINAL, n_save=N_SAVE,
+                                                              align_snapshots=True))}
+            for name, mth in reg.items():
+                calls[name + "|solver"] = (lambda f=mth["solver"], a0=a0, mx=mx, nu=nu: f(a0, mx, nu))
+                calls[name + "|e2e"] = (lambda f=mth["predict"], u0=u0, nu=nu: f(u0, nu))
+            with np.errstate(all="ignore"):
+                t = interleaved_timing(calls, reps=reps, warmup=1)
+            fom_steps = int(-(-max(int(np.ceil(T_FINAL / (0.25 * (L / Nx) / (mx + 1e-8)))), 4 * N_SAVE) // 19) * 19)
+            red_steps = reduced_step_count(mx, Nx, nu, T_FINAL, N_SAVE, align_snapshots=True,
+                                           diffusion_radius=build_tensorial_rom(Phi, k, dealias).diffusion_radius)[0]
+            row["cases"].append({"i": i, "A": A, "nu": nu, "fom_steps": fom_steps,
+                                 "tensorial_steps": red_steps,
+                                 "median_ms": {n: 1e3 * float(np.median(v)) for n, v in t.items()}})
+        med = {n: float(np.mean([c["median_ms"][n] for c in row["cases"]])) for n in row["cases"][0]["median_ms"]}
+        row["mean_of_case_medians_ms"] = med
+        row["speedup_vs_fom"] = {n: med["fom"] / v for n, v in med.items()}
+        acc = {}
+        for i in range(10):
+            A, nu = float(tA[i]), float(tnu[i])
+            ref = aligned_ref(A, nu, Nx)
+            for name, mth in reg.items():
+                with np.errstate(all="ignore"):
+                    acc.setdefault(name, []).append(relative_l2(mth["predict"](ref[0], nu), ref))
+        row["accuracy_first10_test"] = {n: full_err_stats(v) for n, v in acc.items()}
+        out["rows"].append(row)
+        print(f"Nx={Nx}: ms " + ", ".join(f"{n} {v:.2f}" for n, v in med.items() if not n.endswith("solver"))
+              + " | err " + ", ".join(f"{n} {100*v['mean']:.3f}%" for n, v in row["accuracy_first10_test"].items()))
+    out["env"] = finish_env(env)
+    save("scaling", tag, out)
+
+
+# ====================================================================== stage: reference_resolution
+def stage_reference_resolution(tag, fine=1024):
+    """How far the Nx = 128 reference (the target every reduced model is scored against) is from a
+    finer FOM, per test case: the reduced-model errors measure fidelity to the discrete Nx = 128
+    model, and this bounds how that relates to the PDE solution."""
+    env = environment_info()
+    data = load_data()
+    tA, tnu, _ = data["test"]
+    tv = lambda u: float(np.abs(np.diff(np.r_[u, u[:1]])).sum())
+    rows = []
+    for i in range(len(tA)):
+        A, nu = float(tA[i]), float(tnu[i])
+        r = aligned_ref(A, nu, NX).astype(np.float64)
+        f = aligned_ref(A, nu, fine).astype(np.float64)[:, ::fine // NX]
+        rows.append({"i": i, "A": A, "nu": nu, "rel_l2_vs_fine": float(np.linalg.norm(r - f) / np.linalg.norm(f)),
+                     "tv_final_128": tv(r[-1]), "tv_final_fine": tv(f[-1])})
+    e = [x["rel_l2_vs_fine"] for x in rows]
+    out = {"fine_Nx": fine, "rows": rows, "summary": full_err_stats(e)}
+    print(f"Nx=128 reference vs Nx={fine}: mean {100*np.mean(e):.3f}%, max {100*max(e):.3f}%, "
+          f">1%: {sum(x > 0.01 for x in e)}")
+    out["env"] = finish_env(env)
+    save("reference_resolution", tag, out)
+
+
 def _med_us(fn, number=2000, repeat=9):
     return 1e6 * float(np.median(timeit.repeat(fn, number=number, repeat=repeat))) / number
 
 
 STAGES = {"baseline": stage_baseline, "equivalence": stage_equivalence,
           "tensorial_bench": stage_tensorial_bench, "spectral_consistency": stage_spectral_consistency,
-          "deim_sweep": stage_deim_sweep, "stability": stage_stability}
+          "deim_sweep": stage_deim_sweep, "stability": stage_stability, "comparison": stage_comparison,
+          "sensitivity": stage_sensitivity, "scaling": stage_scaling,
+          "reference_resolution": stage_reference_resolution}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
