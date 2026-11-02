@@ -4,8 +4,13 @@
 Every stage writes report/spatial_convergence/<stage>[_<tag>].json; nothing else is modified.
 
 Stages:
-  spatial     FOM error vs N for the representative cases (common fine step) and the 40 test cases
-              (baseline step rule), against the Cole-Hopf solution; consecutive differences E_{N,2N}
+  spatial      FOM error vs N for the representative cases (common fine step) and the 40 test cases
+               (baseline step rule), against the Cole-Hopf solution; consecutive differences E_{N,2N}
+  temporal     FOM time-integration error at fixed N (step refinement vs 64x steps), observed orders
+  reference    verification and uncertainty of the Cole-Hopf reference (quadrature, sampling, FOM)
+  diagnostics  Fourier spectra, front resolution, mass, energy budget, maximum principle, gradients
+  rom          tensorial POD vs N and r: errors vs FOM and exact, projection errors, offline cost
+  timestep     reduced time-step policies: Jacobian analysis, pre-registered acceptance, work-precision
 
 Run:  python scripts/spatial_convergence_study.py <stage> [--tag TAG]
 """
