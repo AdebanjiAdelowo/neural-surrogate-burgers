@@ -609,7 +609,7 @@ historical result file are unchanged.
 
 ## 11. Tests
 
-Full suite: **178 passed, 1 skipped** (116 existing + 62 new; the skip is the existing CUDA check), in
+Full suite: **178 passed, 1 skipped** (116 existing + 62 new; the skip is `tests/test_device.py`'s no-MPS failure-path check, which runs only on machines without Apple MPS), in
 about 13 s, offline, CPU only, deterministic. New tests cover tensor construction and symmetry,
 RHS equivalence (r = 2 to 12, odd Nx), the analytic Jacobian, absence of online FFTs, trajectory
 equivalence under both step policies and aligned snapshots, the float32 first-stage effect, mass

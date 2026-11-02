@@ -214,7 +214,7 @@ networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
 pytest
 ```
 
-179 tests (one CUDA check is skipped without a GPU) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+179 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step
