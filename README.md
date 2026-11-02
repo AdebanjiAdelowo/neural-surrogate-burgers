@@ -152,6 +152,8 @@ neural-surrogate-burgers/
 │   ├── tensorial_pod.py     tensorial POD-Galerkin ROM (precomputed quadratic tensor)
 │   ├── spectral_deim.py     spectral-consistent DEIM, Q-DEIM and oversampled DEIM
 │   ├── energy_conserving.py energy-conserving corrections of quadratic reduced models
+│   ├── convergence.py       float64 solver, cross-grid Fourier errors, Cole-Hopf exact solution
+│   ├── reduced_timestep.py  reduced-order time-step rules and integrators
 │   ├── timestep.py          reduced-model time-step rules and stability tools
 │   ├── snapshot_times.py    time-aligned snapshot saving and resampling
 │   ├── metrics.py           relative L2 error
@@ -167,10 +169,12 @@ neural-surrogate-burgers/
 │   ├── fno_nu_ablation.py   viscosity-blind versus viscosity-aware FNO
 │   ├── timing_numpy_sensitivity.py  DEIM versus full-solver timing under the installed NumPy
 │   ├── tensorial_deim_study.py      tensorial POD and spectral DEIM study (all stages)
-│   └── plot_tensorial_deim_study.py figures for that study
+│   ├── plot_tensorial_deim_study.py figures for that study
+│   ├── spatial_convergence_study.py spatial / temporal convergence and reference verification
+│   └── plot_spatial_convergence_study.py figures for that study
 ├── data/                    generated train/val/test splits (not committed)
 ├── experiments/             trained checkpoints (not committed)
-├── tests/                   180 tests
+├── tests/                   229 tests
 └── report/                  evaluation figures and results; report/audit/ holds the JSON behind
                              the hyper-reduction and FNO numbers below, report/tensorial_deim/
                              the JSON and figures of the tensorial POD / spectral DEIM study
@@ -222,7 +226,7 @@ networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
 pytest
 ```
 
-180 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+229 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step
@@ -373,6 +377,26 @@ Time-aligned protocol, $r = 8$, 40 test cases, Apple M3 Pro, NumPy 1.26.4:
 - Under NumPy 2.4.6 every error above is unchanged (largest per-case difference 4e-7), but the
   speed-ups over the full solver roughly double (tensorial 4.3x to 4.4x), because NumPy 2's FFT is
   about 3x slower at this grid size while the reduced models' small matrix products are not.
+
+## Spatial Convergence and Reference Verification
+
+The reduced models above are scored against the Nx = 128 solver. A follow-up study measures how far that
+solver, and the reduced models, are from the solution of the PDE, using an exact reference from the
+Cole-Hopf transformation (verified against an Nx = 8192 run to about 1e-11). Full report:
+[`report/burgers_spatial_convergence_study.md`](report/burgers_spatial_convergence_study.md).
+
+- The pseudo-spectral solver converges spectrally in space and at fourth order in time. Nx = 128 is not
+  sufficient for steep fronts: on the 40 test cases its error has mean 0.42% and maximum 4.4%, and at
+  A = 2, nu = 0.01 it reaches 7.6% with an 18% overshoot of the maximum principle. Nx = 1024 reaches
+  8.5e-6 on the test set and Nx = 2048 about 1e-6 everywhere in the parameter range.
+- Tensorial POD keeps its accuracy against the exact solution once the full-order model is resolved:
+  6.0e-4, 7.7e-7 and 4.4e-11 for r = 8, 16 and 32 at Nx = 2048. At Nx = 128 every rank r >= 12 is limited
+  by the solver's own spatial error.
+- The DEIM/local-FD model's disadvantage disappears with resolution: ten times less accurate than
+  tensorial POD at Nx = 128, equal at Nx = 2048.
+- A reduced-order time-step rule based on the basis (max|u0| sqrt(rho(L)) instead of the full-grid
+  spacing) passed a pre-registered accuracy and stability test on every case and cuts the cost up to
+  5x; an implicit Radau integrator is fastest when the reduced diffusion is stiff.
 
 ## Possible Extensions
 
