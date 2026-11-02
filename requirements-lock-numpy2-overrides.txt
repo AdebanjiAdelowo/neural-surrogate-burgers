@@ -1,0 +1,3 @@
+# NumPy 2 variant of requirements-lock.in (the versions CI resolved unpinned on 2026-11-02).
+numpy==2.4.6
+scipy==1.17.1

@@ -8,20 +8,33 @@ permissions:
   contents: read
 jobs:
   tests:
+    name: tests (${{ matrix.env }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the environment of the recorded study results (NumPy 1.26.4, SciPy 1.13.1)
+          - env: study-numpy1
+            lock: requirements-lock.txt
+          # the same pins with NumPy 2.4.6 / SciPy 1.17.1
+          - env: numpy2
+            lock: requirements-lock-numpy2.txt
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install dependencies
+      - name: Install pinned dependencies
+        # --no-deps: every package, including Linux-only torch dependencies, comes from the lock file
         run: |
-          python -m pip install -r requirements.txt
-          python -m pip install pytest ruff
+          python -m pip install --no-deps -r ${{ matrix.lock }}
+          python -m pip check
+          python -c "import numpy, scipy, torch; print('numpy', numpy.__version__, 'scipy', scipy.__version__, 'torch', torch.__version__)"
       - name: Syntax validation
         run: python -m compileall -q .
       - name: Critical lint
         run: ruff check . --select E9,F63,F7,F82
       - name: Scientific unit tests
-        run: python -m pytest -q tests
+        run: python -m pytest -q -rs tests

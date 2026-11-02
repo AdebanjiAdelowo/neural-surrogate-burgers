@@ -1,0 +1,48 @@
+{
+ "fft_ifft_us": {
+  "128": 6.041475000529317,
+  "256": 7.23622500008787,
+  "512": 9.996441649855115,
+  "1024": 14.691177049826365
+ },
+ "env": {
+  "cpu": "Apple M3 Pro",
+  "n_cpu": 11,
+  "mem_gb": 18.0,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.13",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "blas": "accelerate (numpy.show_config)",
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "VECLIB_MAXIMUM_THREADS": null,
+   "MKL_NUM_THREADS": null
+  },
+  "git_head": "8f9d5ba4c7a5ec8380762e78cc44245b97571aa4",
+  "git_dirty_paths": 14,
+  "loadavg_start": [
+   3.361328125,
+   2.7119140625,
+   2.4462890625
+  ],
+  "top_cpu_processes_start": [
+   "118.3 Code Helper (Plugin)",
+   " 55.9 WindowServer",
+   " 54.6 python",
+   " 39.2 Google Chrome Helper (Aperitif Renderer)",
+   " 21.8 Google Chrome"
+  ],
+  "power": "Now drawing from 'Battery Power'",
+  "torch": "2.15.0",
+  "torch_threads": 5,
+  "mps_available": true,
+  "cuda_available": false,
+  "loadavg_end": [
+   4.1796875,
+   2.9033203125,
+   2.5166015625
+  ]
+ },
+ "tensorial_rhs_r8_us": 1.2156707998656202
+}

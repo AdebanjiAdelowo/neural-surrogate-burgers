@@ -20,7 +20,7 @@ For the tested solution family, the classical ROM is extremely accurate, while t
 | | |
 |---|---|
 | **Problem** | Parametric 1D viscous Burgers equation |
-| **Methods** | Pseudo-spectral FOM, POD-Galerkin ROM, DEIM/local-FD hyper-reduction, MLP and FNO surrogates |
+| **Methods** | Pseudo-spectral FOM, POD-Galerkin ROM (original and tensorial), DEIM/local-FD and spectral-consistent DEIM hyper-reduction, MLP and FNO surrogates |
 | **Verification** | Physical diagnostics, grid checks, POD/operator tests, DEIM isolation tests, time-step stability checks and multi-seed learned models |
 | **Headline result** | The classical ROM is exceptionally accurate for this compressible solution family; learned models are fast in-distribution but degrade under extrapolation |
 | **Main qualification** | Conclusions are specific to the tested initial-condition/viscosity family, architectures and laptop/T4-scale benchmarks |
@@ -149,6 +149,9 @@ neural-surrogate-burgers/
 │   ├── general_ic_solver.py solver for arbitrary initial conditions (out-of-family test set)
 │   ├── pod_rom.py           POD-Galerkin reduced-order model
 │   ├── deim.py              DEIM/local-finite-difference hyper-reduced ROM
+│   ├── tensorial_pod.py     tensorial POD-Galerkin ROM (precomputed quadratic tensor)
+│   ├── spectral_deim.py     spectral-consistent DEIM, Q-DEIM and oversampled DEIM
+│   ├── energy_conserving.py energy-conserving corrections of quadratic reduced models
 │   ├── timestep.py          reduced-model time-step rules and stability tools
 │   ├── snapshot_times.py    time-aligned snapshot saving and resampling
 │   ├── metrics.py           relative L2 error
@@ -162,12 +165,15 @@ neural-surrogate-burgers/
 │   ├── hyperreduction_benchmark.py  40-case accuracy and timing of the reduced models
 │   ├── hyperreduction_followup.py   time-step, stability, stencil and aligned-data studies
 │   ├── fno_nu_ablation.py   viscosity-blind versus viscosity-aware FNO
-│   └── timing_numpy_sensitivity.py  DEIM versus full-solver timing under the installed NumPy
+│   ├── timing_numpy_sensitivity.py  DEIM versus full-solver timing under the installed NumPy
+│   ├── tensorial_deim_study.py      tensorial POD and spectral DEIM study (all stages)
+│   └── plot_tensorial_deim_study.py figures for that study
 ├── data/                    generated train/val/test splits (not committed)
 ├── experiments/             trained checkpoints (not committed)
-├── tests/                   98 tests
+├── tests/                   180 tests
 └── report/                  evaluation figures and results; report/audit/ holds the JSON behind
-                             the hyper-reduction and FNO numbers below
+                             the hyper-reduction and FNO numbers below, report/tensorial_deim/
+                             the JSON and figures of the tensorial POD / spectral DEIM study
 ```
 
 ## Installation
@@ -177,6 +183,14 @@ Requires Python 3.11 with the packages listed in `requirements.txt`: `numpy`, `s
 
 ```bash
 pip install -r requirements.txt
+```
+
+For a reproducible environment, install the pinned lock file used by CI (Python 3.11, macOS or Linux):
+`requirements-lock.txt` (NumPy 1.26.4, the environment of the tensorial POD / spectral DEIM results) or
+`requirements-lock-numpy2.txt` (NumPy 2.4.6).
+
+```bash
+pip install --no-deps -r requirements-lock.txt && pip check
 ```
 
 ## Usage
@@ -208,19 +222,24 @@ networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
 pytest
 ```
 
-98 tests cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+180 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step
 rules and stability tools (including a check that scripts reproducing historical tables pin the
-historical rule), time-aligned snapshot saving, the benchmark and audit code, and the
-surrogate network (forward-pass shape and finiteness).
+historical rule), time-aligned snapshot saving, the benchmark and audit code, the
+surrogate network (forward-pass shape and finiteness), and the tensorial POD, spectral DEIM and
+energy-conserving models (equivalence with the original ROM to rounding, exact sampling of the
+spectral operator, interpolation and point selection, and the absence of online FFTs).
 
 ## Limitations
 
 - The plain POD-ROM evaluates the nonlinear term on the full grid at every RK4 stage, so it is slower
-  than the full solver despite reducing the state dimension. The DEIM/local-FD variant removes that
-  cost but is linearly unstable on steep, low-viscosity trajectories (see below).
+  than the full solver despite reducing the state dimension; its tensorial form (below) removes that
+  cost without changing the model. The DEIM/local-FD variant is linearly unstable on steep,
+  low-viscosity trajectories (see below).
+- Reduced-model errors are measured against the Nx = 128 solver, which differs from an Nx = 1024
+  solution by up to 3.9% on the steepest test cases.
 - The neural surrogate is trained only on the sinusoidal single-mode initial condition family
   described above; its extrapolation behaviour outside $A \in [0.5, 2.0]$, $\nu \in [0.01, 0.1]$ is
   not representative of other initial-condition families.
@@ -319,6 +338,41 @@ solver. The DEIM/local-FD model removes the full-grid cost but is unreliable on 
 cases, and at Nx = 128 its speed advantage over the full solver depends on the FFT implementation.
 The FNO is the fastest per query and, given the viscosity, accurate in distribution, but it does not
 transfer to a new initial-condition family.
+
+## Tensorial POD-Galerkin and Spectral-Consistent DEIM
+
+Because Burgers' nonlinearity is quadratic, the POD-Galerkin right-hand side of the pseudo-spectral
+model can be written exactly as $\dot a_i = \sum_{jk} Q_{ijk} a_j a_k + \nu \sum_j L_{ij} a_j$, with
+$Q_{ijk} = \phi_i^\top G(\phi_j \odot \phi_k)$ built offline from the solver's own dealiased spectral
+operator $G$. The same construction, restricted to sampled grid points, gives a DEIM model that
+interpolates the exact spectral operator instead of local finite differences. Details, derivations
+and all results are in [`report/tensorial_pod_spectral_deim_study.md`](report/tensorial_pod_spectral_deim_study.md).
+
+Time-aligned protocol, $r = 8$, 40 test cases, Apple M3 Pro, NumPy 1.26.4:
+
+| Method | Mean error | Max error | End-to-end time | vs full solver |
+|---|---|---|---|---|
+| Full solver | (reference) | | 3.24 ms | 1.00x |
+| POD-Galerkin, original | 0.0466% | 0.098% | 7.45 ms | 0.44x |
+| Tensorial POD-Galerkin | 0.0466% | 0.098% | 1.36 ms | 2.38x |
+| DEIM/local-FD, $m = 16$ | 4.31% | 52.9% | 3.48 ms | 0.93x |
+| Spectral Q-DEIM, $m = 16$ | 0.0467% | 0.098% | 1.95 ms | 1.66x |
+
+- The tensorial model reproduces the original reduced vector field to $4 \times 10^{-14}$ and its
+  trajectories to $4 \times 10^{-16}$ (relative), and is 7.0x faster than the full solver at
+  $N_x = 1024$ (four cases).
+- Spectral-consistent DEIM (greedy, Q-DEIM and oversampled, 48 configurations) was stable on all 80
+  validation and test cases. With the DEIM/local-FD model's own basis and points, exact spectral
+  values remove its positive Jacobian eigenvalues and bring every high-error case to the Galerkin
+  error, so its failures come from the local finite differences, not from the interpolation.
+- No DEIM variant is faster or more accurate than the tensorial model: for a quadratic term, a sampled
+  evaluation with $s \ge r$ points costs at least as much as the exact $r \times r \times r$ tensor.
+- An energy-conserving projection of the reduced tensor removes spurious energy growth but, in its
+  unweighted form, lowers accuracy; a variance-weighted form improves the DEIM/local-FD model
+  (4.31% to 2.67%) without making it reliable.
+- Under NumPy 2.4.6 every error above is unchanged (largest per-case difference 4e-7), but the
+  speed-ups over the full solver roughly double (tensorial 4.3x to 4.4x), because NumPy 2's FFT is
+  about 3x slower at this grid size while the reduced models' small matrix products are not.
 
 ## Possible Extensions
 
