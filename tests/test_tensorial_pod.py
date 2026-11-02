@@ -163,6 +163,16 @@ def test_float32_initial_state_explains_larger_difference():
     assert np.abs(a_o32 - a_o64).max() <= 1e-6 * scale                   # ... but tiny
 
 
+def test_diffusion_matrix_is_float64_accurate_for_a_float32_basis():
+    """Regression: NumPy >= 2 transforms float32 input in single precision, which once made L from
+    the stored float32 basis accurate to only ~1e-8. L must not depend on the basis dtype."""
+    Phi64, k, dealias = _basis()
+    Phi32 = Phi64.astype(np.float32)
+    L32 = build_tensorial_rom(Phi32, k, dealias).L
+    L_ref = build_tensorial_rom(Phi32.astype(np.float64), k, dealias).L
+    assert np.abs(L32 - L_ref).max() <= 1e-13 * np.abs(L_ref).max()
+
+
 def test_predict_equals_original_rom_predict_to_float32_output():
     Phi, k, dealias = _basis()
     Nx = Phi.shape[0]

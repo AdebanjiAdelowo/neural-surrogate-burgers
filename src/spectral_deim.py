@@ -178,11 +178,15 @@ def build_spectral_deim(Phi: np.ndarray, Psi: np.ndarray, points: np.ndarray, k:
     M = (Phi64.T @ np.asarray(Psi, dtype=np.float64)) @ interpolation_pinv(Psi, points)
     C = sampled_quadratic_tensor(Phi, points, k, dealias)
     if target == "nonlinear":
-        Lin = reduced_diffusion_matrix_rom(Phi, k)  # same matrix (and dt) as the plain ROM
+        # same matrix as the plain ROM, in float64 (see src.tensorial_pod.build_tensorial_rom), and
+        # the same step-size radius as src.pod_rom computes on the basis as given
+        Lin = reduced_diffusion_matrix_rom(Phi64, k)
+        radius = spectral_radius(reduced_diffusion_matrix_rom(Phi, k))
     else:
         Lin = M @ sampled_diffusion(Phi, points, k)
+        radius = spectral_radius(Lin)
     return SpectralDEIM(target=target, points=points, M=M, C=C, Lin=Lin, Nx=Phi.shape[0],
-                        diffusion_radius=spectral_radius(Lin),
+                        diffusion_radius=radius,
                         conditioning=interpolation_conditioning(Psi, points))
 
 

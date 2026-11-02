@@ -82,11 +82,13 @@ class TensorialROM:
 def build_tensorial_rom(Phi: np.ndarray, k: np.ndarray, dealias: np.ndarray) -> TensorialROM:
     """Offline stage: Q and L from the POD basis and the solver's own spectral operators.
 
-    L (and so rho(L)) is computed by src.timestep.reduced_diffusion_matrix_rom on the basis exactly
-    as given, so the "reduced" step-size rule picks the same dt as src.pod_rom for the same basis."""
-    L = reduced_diffusion_matrix_rom(Phi, k)
+    L is built from a float64 copy of the basis: NumPy >= 2 transforms float32 input in single
+    precision, whereas the original ROM applies D2 to a float64 field at every stage. rho(L) for the
+    "reduced" step-size rule is computed exactly as src.pod_rom does (on the basis as given), so both
+    models pick the same dt for the same basis."""
+    L = reduced_diffusion_matrix_rom(np.asarray(Phi, dtype=np.float64), k)
     return TensorialROM(Q=build_quadratic_tensor(Phi, k, dealias), L=L, Nx=Phi.shape[0],
-                        diffusion_radius=spectral_radius(L))
+                        diffusion_radius=spectral_radius(reduced_diffusion_matrix_rom(Phi, k)))
 
 
 def quadratic_rhs(Q_flat: np.ndarray, Lnu: np.ndarray):

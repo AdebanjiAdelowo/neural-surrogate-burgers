@@ -170,7 +170,7 @@ neural-surrogate-burgers/
 │   └── plot_tensorial_deim_study.py figures for that study
 ├── data/                    generated train/val/test splits (not committed)
 ├── experiments/             trained checkpoints (not committed)
-├── tests/                   179 tests
+├── tests/                   180 tests
 └── report/                  evaluation figures and results; report/audit/ holds the JSON behind
                              the hyper-reduction and FNO numbers below, report/tensorial_deim/
                              the JSON and figures of the tensorial POD / spectral DEIM study
@@ -214,7 +214,7 @@ networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
 pytest
 ```
 
-179 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+180 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step

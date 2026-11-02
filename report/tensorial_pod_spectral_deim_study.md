@@ -602,14 +602,14 @@ resolution study against an Nx = 1024 reference; tensorial models for higher ran
 | `src/energy_conserving.py` | Sym(Q), Frobenius and variance-weighted energy-conserving projections, energy diagnostics, exact folding of the hybrid local-FD model |
 | `scripts/tensorial_deim_study.py` | all experiment stages (Section 13) |
 | `scripts/plot_tensorial_deim_study.py` | Figures 1 to 12 |
-| `tests/test_tensorial_pod.py` (23), `tests/test_spectral_deim.py` (28), `tests/test_energy_conserving.py` (11) | see Section 11 |
+| `tests/test_tensorial_pod.py` (24), `tests/test_spectral_deim.py` (28), `tests/test_energy_conserving.py` (11) | see Section 11 |
 
 `src/solver.py`, `src/pod_rom.py`, `src/deim.py`, `src/timestep.py`, the data files and every
 historical result file are unchanged.
 
 ## 11. Tests
 
-Full suite: **178 passed, 1 skipped** (116 existing + 62 new; the skip is `tests/test_device.py`'s no-MPS failure-path check, which runs only on machines without Apple MPS), in
+Full suite: **179 passed, 1 skipped** under NumPy 1.26.4 (116 existing + 63 new; the skip is `tests/test_device.py`'s no-MPS failure-path check, which runs only on machines without Apple MPS), in
 about 13 s, offline, CPU only, deterministic. New tests cover tensor construction and symmetry,
 RHS equivalence (r = 2 to 12, odd Nx), the analytic Jacobian, absence of online FFTs, trajectory
 equivalence under both step policies and aligned snapshots, the float32 first-stage effect, mass
@@ -619,6 +619,13 @@ Q-DEIM pivots, greedy oversampling monotonicity and determinism, the two exactne
 DEIM targets; energy-conserving projections (zero cubic form, symmetry, idempotence, orthogonality,
 weighted optimality, energy non-increase along a trajectory) and exact folding of the hybrid model
 for stencil orders 2 and 4.
+
+**NumPy versions.** All reported numbers were produced with NumPy 1.26.4. NumPy 2 transforms float32
+input in single precision; since the stored basis is float32, the reduced Laplacian L is built from a
+float64 copy of the basis so that it does not depend on the NumPy version (under NumPy 1.26.4 this is
+bit-identical to the original computation, and every per-case error is unchanged). The new modules'
+tests and the existing NumPy-only tests also pass under NumPy 2.4.6 / SciPy 1.17.1, the versions the
+repository's CI installs from the unpinned `requirements.txt`.
 
 ## 12. Data and protocol notes
 
