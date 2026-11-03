@@ -145,7 +145,8 @@ transform) 0.07 / 0.21 / 1.3 ms for r = 8 / 16 / 32 (single measurements; 0.9 / 
 runs); phi_1..phi_3 of a diagonal argument about 0.1 ms per new step size; the general block-matrix route
 0.12 / 0.16 / 508 ms, so the eigenbasis is essential at r = 32. Per-trajectory setup (new nu) about 2 to 3 us.
 
-**Overhead of error control.** Per RHS evaluation X1 costs 13.5 / 7.6 / 20 us (r = 8 / 16 / 32) against 3.9 /
+**Overhead of error control** (single-run exploration timings on the validation + stress cases, not the
+controlled benchmark). Per RHS evaluation X1 costs 13.5 / 7.6 / 20 us (r = 8 / 16 / 32) against 3.9 /
 4.5 / 12 us for the fixed-step IF-RK4 (stage exponentials, error norm and control logic in Python): 1.6 to 3.5
 times more per evaluation. Error control pays off when it cuts the number of evaluations by more than that:
 at r = 16 and target 1e-6, X1 needs about 1000 evaluations, the fixed-step IF-RK4 meeting the same target
@@ -160,6 +161,16 @@ test errors); evaluation on the 40 original test cases (**not fully independent*
 this study and they were used in Stage 1) and a **fresh holdout** of 40 cases from U(0.5, 2) x U(0.01, 0.1)
 (`default_rng(300000)`) plus 10 steep cases from U(1.5, 2) x U(0.010, 0.020) (`default_rng(300001)`), drawn
 only after the selection was committed (`selection_frozen.json`, commit 5ec6cc2).
+
+**Three error measures (kept separate throughout).**
+* *Time-integration error* of a method: relative space-time error of its coefficient trajectory against a
+  high-accuracy solution of the **same reduced ODE** (below). Solver tolerances, the targets tau and all
+  selection and acceptance rules refer to this error only.
+* *Reduced-model (POD and reduced-dynamics) approximation error*: the error of the time-converged reduced
+  solution against the Cole-Hopf solution. No integrator can remove it; it is not attributed to integrators.
+* *Total error*: a method's reconstructed field against the Cole-Hopf solution. By the triangle inequality it
+  is at most the sum of the two errors above (the norms do not add exactly); once the time-integration error
+  is well below the reduced-model error, the total error equals the latter (Section 12).
 
 **References.** Time error: the same reduced ODE by classical RK4 with 4 times the default step count
 (self-check against 8 times: <= 3.2e-14 at every rank). Total error: the Cole-Hopf solution of PR #4
@@ -192,6 +203,13 @@ configuration x set combinations the held-out maximum exceeds it, once by more t
 DOP853 rtol 1e-10 at r = 8 on the test set); the target / 2 margin and the conservative error-to-tolerance
 ratios kept every frozen choice within its target (Figure 14). This is evidence of generalization for this
 parameter box, not a guarantee.
+
+**Timing protocol and variability.** Within each held-out set every method is timed on the same cases (40
+test, 50 holdout, identical in both runs), all methods for a case in one round-robin loop. The spread of the 5
+repetitions within a case (interquartile range / median, median over cases) is 0.20 for the median
+configuration (range 0.01 to 0.60). The two runs' medians differ by 5% for the median configuration and by up
+to 35%; 6 of 120 configuration x rank x set entries differ by more than 20%. Comparisons with differences
+below about 20% are therefore treated as ties unless both runs agree.
 
 **Pre-registered matched-accuracy comparison.** Each method is represented only by its setting frozen for
 that target; listed are those meeting the target (maximum time error on the set <= target), with median
