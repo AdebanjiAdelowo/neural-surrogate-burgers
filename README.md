@@ -154,6 +154,9 @@ neural-surrogate-burgers/
 │   ├── energy_conserving.py energy-conserving corrections of quadratic reduced models
 │   ├── convergence.py       float64 solver, cross-grid Fourier errors, Cole-Hopf exact solution
 │   ├── reduced_timestep.py  reduced-order time-step rules and integrators
+│   ├── exponential_integrators.py  integrating-factor and exponential integrators
+│   ├── adaptive_integrators.py     error-controlled integration drivers
+│   ├── reduced_stiffness.py        reduced-system stiffness diagnostics
 │   ├── timestep.py          reduced-model time-step rules and stability tools
 │   ├── snapshot_times.py    time-aligned snapshot saving and resampling
 │   ├── metrics.py           relative L2 error
@@ -171,10 +174,12 @@ neural-surrogate-burgers/
 │   ├── tensorial_deim_study.py      tensorial POD and spectral DEIM study (all stages)
 │   ├── plot_tensorial_deim_study.py figures for that study
 │   ├── spatial_convergence_study.py spatial / temporal convergence and reference verification
-│   └── plot_spatial_convergence_study.py figures for that study
+│   ├── plot_spatial_convergence_study.py figures for that study
+│   ├── adaptive_integrators_study.py adaptive time-integration study
+│   └── plot_adaptive_integrators_study.py figures for that study
 ├── data/                    generated train/val/test splits (not committed)
 ├── experiments/             trained checkpoints (not committed)
-├── tests/                   230 tests
+├── tests/                   286 tests
 └── report/                  evaluation figures and results; report/audit/ holds the JSON behind
                              the hyper-reduction and FNO numbers below, report/tensorial_deim/
                              the JSON and figures of the tensorial POD / spectral DEIM study
@@ -226,7 +231,7 @@ networks on an NVIDIA GPU; a completed Tesla T4 run is preserved in
 pytest
 ```
 
-230 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
+286 tests (one device test runs only on machines without Apple MPS) cover the solver (mass conservation, energy dissipation, viscosity trend, grid-refinement
 consistency), the POD-ROM (basis orthonormality, energy-capture monotonicity, error decreasing with
 retained modes, stability under extrapolated viscosity), the DEIM/local-FD model (including a check
 that no full-grid array is touched in its time loop), the FNO and its viscosity input, the time-step
@@ -401,6 +406,22 @@ Cole-Hopf transformation (verified against an Nx = 8192 run to about 1e-11). Ful
   POD at Nx = 2048 with Radau is no less accurate than the Nx = 512 solver in mean and worst-case error and
   1.6x to 1.75x faster; at r = 32 it is no less accurate than the Nx = 1024 solver and 4.3x to 4.6x faster.
   On most individual smoother cases the full solver remains more accurate.
+
+## Adaptive Time Integration for Tensorial POD
+
+A follow-up study compares error-controlled integrators for the tensorial POD model at Nx = 2048 (ranks 8,
+16, 32): adaptive RK45 / DOP853, Radau, an adaptive integrating-factor (Lawson) Dormand-Prince 5(4) and an
+exponential (Krogstad ETD-RK4) method, against the fixed-step rules above. Settings were chosen on validation
+data plus a stress set of steep cases, frozen, and then evaluated on the test set and a fresh holdout. Full
+report: [`report/adaptive_tensorial_pod_integrators_study.md`](report/adaptive_tensorial_pod_integrators_study.md).
+
+- The earlier fixed-step integrating-factor failure was temporal truncation error from a stability-based
+  step, not an instability.
+- Every frozen configuration met its time-error target on every held-out case.
+- The best integrator depends on rank and accuracy target: Radau at ranks 8 and 16 for tight targets; at
+  rank 32 the adaptive integrating-factor method is 1.5x to 1.8x faster than Radau at a 1e-8 target. Explicit
+  adaptive methods are limited by stiffness at rank 32.
+- Once the time error is below the POD error, the basis, not the integrator, sets the total accuracy.
 
 ## Possible Extensions
 
