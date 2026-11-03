@@ -478,8 +478,53 @@ def stage_final(tag, reps=5):
     save("final", tag, out)
 
 
+# =================================================================================== stage: compare
+def stage_compare(tag, runs=("run1", "run2")):
+    """Pre-registered comparison (PLAN.md Section 7) from the stored final runs: for each held-out set,
+    rank and target, every method is represented ONLY by the setting frozen for that target; it meets the
+    target if its maximum time error on the set is <= target. The 'fastest' method is the one with the
+    lowest median end-to-end time among those that meet it, in each run. (The 'fastest' lists printed by
+    the final stage consider every frozen configuration for every target, which would credit settings
+    chosen for another target; they are descriptive only.)"""
+    R = {t: json.load(open(os.path.join(OUT_DIR, f"final_{t}.json"))) for t in runs if
+         os.path.exists(os.path.join(OUT_DIR, f"final_{t}.json"))}
+    frozen = json.load(open(os.path.join(OUT_DIR, "selection_frozen.json")))["selection"]
+    out = {"runs": list(R), "table": {}}
+    for r in R_LIST:
+        for sname in ("test", "holdout"):
+            for tau in TARGETS:
+                entries = []
+                for meth in METHODS:
+                    s = frozen[f"r{r}|{meth}|{tau:g}"]
+                    if s is None:
+                        entries.append({"method": meth, "setting": None, "eligible": False})
+                        continue
+                    n = cfg_name((meth, s))
+                    first = R[runs[0]]["by_r"][str(r)]["summary"][sname][n]
+                    entries.append({
+                        "method": meth, "setting": n, "eligible": True,
+                        "time_err_max": first["time_err_max"], "meets": bool(first["time_err_max"] <= tau),
+                        "reliability": first["reliability"][f"{tau:g}"],
+                        "err_vs_exact_mean": first["err_vs_exact_mean"],
+                        "rhs_evals_mean": first["rhs_evals_mean"],
+                        "e2e_ms_median": {t: R[t]["by_r"][str(r)]["summary"][sname][n]["e2e_ms_median"] for t in R},
+                        "e2e_ms_p10_p90": {t: [R[t]["by_r"][str(r)]["summary"][sname][n]["e2e_ms_p10"],
+                                               R[t]["by_r"][str(r)]["summary"][sname][n]["e2e_ms_p90"]] for t in R}})
+                fastest = {t: min(((e["e2e_ms_median"][t], e["method"]) for e in entries if e.get("meets")), default=None)
+                           for t in R}
+                out["table"][f"r{r}|{sname}|{tau:g}"] = {"entries": entries, "fastest": fastest}
+                met = [e for e in entries if e.get("meets")]
+                failed = [f"{e['method']}({e['setting']}: {e['time_err_max']:.1e})" for e in entries
+                          if e.get("eligible") and not e["meets"]]
+                print(f"r={r:2d} {sname:7s} tau={tau:g}: fastest " +
+                      " / ".join(f"{t}: {v[1]} {v[0]:.2f} ms" if v else f"{t}: none" for t, v in fastest.items())
+                      + " | meets: " + ", ".join(f"{e['method']} {e['e2e_ms_median'][runs[0]]:.1f}" for e in sorted(met, key=lambda e: e['e2e_ms_median'][runs[0]]))
+                      + (" | FAILED: " + ", ".join(failed) if failed else ""))
+    save("compare", tag, out)
+
+
 STAGES = {"if_failure": stage_if_failure, "stiffness": stage_stiffness, "explore": stage_explore,
-          "select": stage_select, "final": stage_final}
+          "select": stage_select, "final": stage_final, "compare": stage_compare}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
